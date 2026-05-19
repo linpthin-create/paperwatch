@@ -1,0 +1,2 @@
+"""Notification integrations for PaperWatch."""
+

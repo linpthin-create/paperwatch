@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.paperwatch.daily</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/absolute/path/to/python3</string>
+    <string>-m</string>
+    <string>paperwatch</string>
+    <string>run</string>
+    <string>--config</string>
+    <string>/absolute/path/to/config.toml</string>
+    <string>--days</string>
+    <string>1</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/absolute/path/to/config-directory</string>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>12</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/absolute/path/to/config-directory/data/logs/paperwatch.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/absolute/path/to/config-directory/data/logs/paperwatch.err.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

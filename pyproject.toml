@@ -1,0 +1,18 @@
+[project]
+name = "paperwatch"
+version = "0.1.0"
+description = "Daily paper watcher for arXiv and other scholarly sources."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+paperwatch = "paperwatch.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

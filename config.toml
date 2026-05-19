@@ -1,0 +1,117 @@
+timezone = "Asia/Shanghai"
+daily_limit = 20
+per_interest_limit = 10
+database_path = "data/papers.sqlite"
+digest_dir = "data/digests"
+
+[schedule]
+enabled = false
+hour = 12
+minute = 30
+days = 1
+
+[feishu]
+enabled = false
+send_on_schedule = true
+webhook_url = ""
+secret = ""
+timeout_seconds = 15
+
+[ranking]
+mode = "keyword"
+candidate_limit_per_interest = 40
+# Modes:
+# - "keyword": stable local ranker, no API key needed.
+# - "embedding": semantic rerank using [embedding].
+# - "ai": keyword ranking plus AI TL;DR/priority for selected papers.
+# - "embedding_ai": semantic rerank plus AI TL;DR/priority.
+
+[embedding]
+api_key = ""
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1"
+model = "text-embedding-3-small"
+timeout_seconds = 60
+
+[ai]
+api_key = ""
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1"
+model = "gpt-4.1-mini"
+language = "Chinese"
+max_papers_per_interest = 10
+timeout_seconds = 90
+
+[digest_ai]
+api_key = ""
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1"
+model = "gpt-4.1-mini"
+language = "Chinese"
+max_papers_per_interest = 10
+timeout_seconds = 90
+
+[translation]
+enabled = true
+language = "Chinese"
+translate_title = true
+translate_abstract = true
+max_papers_per_run = 20
+
+[interest_ai]
+api_key = ""
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1"
+model = "gpt-4.1-mini"
+timeout_seconds = 90
+
+[sources.arxiv]
+enabled = true
+max_results_per_interest = 80
+include_cross_list = true
+request_timeout_seconds = 30
+default_fetch_interests = ["CV Model Generation"]
+
+[sources.openalex]
+enabled = false
+max_results_per_interest = 40
+request_timeout_seconds = 30
+mailto = ""
+
+[sources.dblp]
+enabled = false
+max_results_per_interest = 40
+request_timeout_seconds = 30
+
+[[interests]]
+name = "CV Model Generation"
+description = "Computer vision generative models, including diffusion, autoregressive image generation, video generation, 3D generation, multimodal generation, controllable generation, and efficient generative modeling."
+arxiv_categories = ["cs.CV", "cs.AI", "cs.LG", "eess.IV"]
+keywords = [
+  "image generation",
+  "video generation",
+  "text-to-image",
+  "text to image",
+  "diffusion model",
+  "diffusion models",
+  "generative model",
+  "generative models",
+  "vision generation",
+  "controllable generation",
+  "image synthesis",
+  "video synthesis",
+  "3D generation",
+  "text-to-3D",
+  "multimodal generation",
+  "visual generation",
+  "autoregressive image",
+  "flow matching",
+  "rectified flow",
+  "consistency model",
+  "latent diffusion"
+]
+negative_keywords = [
+  "medical image segmentation",
+  "object detection only",
+  "classification only"
+]
