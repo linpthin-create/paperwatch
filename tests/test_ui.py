@@ -101,6 +101,12 @@ class UiTest(unittest.TestCase):
         self.assertNotIn("Yesterday", INDEX_HTML)
         self.assertNotIn("Preview rerank", INDEX_HTML)
 
+    def test_serve_ui_accepts_open_browser_argument(self):
+        import inspect
+        from paperwatch.ui import serve_ui
+
+        self.assertIn("open_browser", inspect.signature(serve_ui).parameters)
+
     def test_extract_arxiv_id_from_abs_url(self):
         self.assertEqual(_extract_arxiv_id("https://arxiv.org/abs/2605.12345"), "2605.12345")
         self.assertEqual(_extract_arxiv_id("arXiv:2605.12345v2"), "2605.12345v2")

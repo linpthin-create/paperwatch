@@ -1,8 +1,44 @@
 # PaperWatch
 
-PaperWatch is a local paper-watching tool for daily research tracking. It fetches papers from enabled sources, filters and ranks them by your configured interests, writes Markdown digests, translates selected papers when configured, and can send the result to Feishu.
+PaperWatch is a local Web UI for tracking new research papers. It fetches papers from arXiv, OpenAlex, and dblp, ranks them by your interests, writes Markdown digests, can translate results, and can send reports to Feishu.
 
-The current source backends are arXiv, OpenAlex, and dblp. Multiple sources can be enabled at the same time; PaperWatch deduplicates papers across sources by source id, DOI, arXiv id, and normalized title.
+## Quick Start
+
+Install directly from GitHub and open the Web UI:
+
+```bash
+python3 -m pip install "git+https://github.com/linpthin-create/paperwatch.git"
+paperwatch ui --open
+```
+
+The browser opens:
+
+```text
+http://127.0.0.1:8765
+```
+
+That is the main app. Use the `Config` page to edit interests, sources, translation APIs, Feishu, and scheduled fetch settings. Use the `Digests` page to view reports and manually send a report to Feishu.
+
+If you prefer to clone the repository first:
+
+```bash
+git clone https://github.com/linpthin-create/paperwatch.git
+cd paperwatch
+python3 -m pip install -e .
+paperwatch ui --open
+```
+
+PaperWatch creates a clean `config.toml` automatically on first run. It does not ship with any API keys or Feishu webhook.
+
+## Fast Setup In The UI
+
+1. Open `Config`.
+2. Add or edit your `Interests`.
+3. Choose paper `Sources`, such as arXiv, OpenAlex, and dblp.
+4. Optional: configure `Translation API`, `Digest AI API`, `Ranking Embedding API`, and `Interest Builder API`.
+5. Optional: configure `Feishu`.
+6. Optional: configure `Schedule`, then click `Install on this PC`.
+7. Click `Run fetch` from the left panel to generate a report immediately.
 
 ## Features
 
@@ -18,7 +54,7 @@ The current source backends are arXiv, OpenAlex, and dblp. Multiple sources can 
 - SQLite storage for fetched papers and sent status under `data/papers.sqlite`.
 - Feishu custom-bot notifications for scheduled runs and manual digest sending.
 
-## Install
+## Local Development Install
 
 From the repository:
 
@@ -40,7 +76,7 @@ Create a default config:
 paperwatch init-config --output config.toml
 ```
 
-## Package
+## Build A Wheel
 
 Build a wheel:
 
@@ -60,12 +96,12 @@ After installation, the command-line entry point is:
 paperwatch --help
 ```
 
-## Commands
+## Common Commands
 
 Start the local UI:
 
 ```bash
-paperwatch ui --host 127.0.0.1 --port 8765
+paperwatch ui --open
 ```
 
 Run a scheduled-style daily fetch for yesterday:

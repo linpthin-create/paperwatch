@@ -10,6 +10,7 @@ import tempfile
 import threading
 import time
 import uuid
+import webbrowser
 import contextlib
 import io
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -36,7 +37,7 @@ _RUN_JOBS: dict[str, dict[str, object]] = {}
 _RUN_JOBS_LOCK = threading.Lock()
 
 
-def serve_ui(host: str, port: int, config_path: str) -> None:
+def serve_ui(host: str, port: int, config_path: str, open_browser: bool = False) -> None:
     ensure_default_config(config_path)
 
     class Handler(PaperWatchHandler):
@@ -44,7 +45,10 @@ def serve_ui(host: str, port: int, config_path: str) -> None:
 
     Handler.config_path = Path(config_path)
     server = ThreadingHTTPServer((host, port), Handler)
-    print(f"PaperWatch UI: http://{host}:{port}")
+    url = f"http://{host}:{port}"
+    print(f"PaperWatch UI: {url}")
+    if open_browser:
+        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     server.serve_forever()
 
 

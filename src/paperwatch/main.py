@@ -47,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     ui.add_argument("--config", default="config.toml")
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8765)
+    ui.add_argument("--open", action="store_true", help="Open the web UI in the default browser.")
 
     schedule = sub.add_parser("schedule", help="Install, uninstall, or inspect the local automatic fetch schedule.")
     schedule.add_argument("--config", default="config.toml")
@@ -67,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         return _run(args)
     if args.command == "ui":
-        serve_ui(args.host, args.port, args.config)
+        serve_ui(args.host, args.port, args.config, open_browser=args.open)
         return 0
     if args.command == "schedule":
         return _schedule(args)
