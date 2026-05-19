@@ -11,15 +11,7 @@ python3 -m pip install "git+https://github.com/linpthin-create/paperwatch.git"
 paperwatch ui --open
 ```
 
-The browser opens:
-
-```text
-http://127.0.0.1:8765
-```
-
-That is the main app. Use the `Config` page to edit interests, sources, translation APIs, Feishu, and scheduled fetch settings. Use the `Digests` page to view reports and manually send a report to Feishu.
-
-If you prefer to clone the repository first:
+This install command needs outbound HTTPS access to GitHub. If your macOS firewall, company proxy, campus network, or Python environment blocks network installs, clone or download the repository first, then install locally:
 
 ```bash
 git clone https://github.com/linpthin-create/paperwatch.git
@@ -28,7 +20,23 @@ python3 -m pip install -e .
 paperwatch ui --open
 ```
 
-PaperWatch creates a clean `config.toml` automatically on first run. It does not ship with any API keys or Feishu webhook.
+The browser opens:
+
+```text
+http://127.0.0.1:8765
+```
+
+That is the main app. Use the `Config` page to edit interests, sources, translation APIs, Feishu, and scheduled fetch settings. Use the `Digests` page to view reports and manually send a report to Feishu.
+
+If `paperwatch ui --open` cannot open the browser automatically, start the UI and open the address manually:
+
+```bash
+paperwatch ui
+```
+
+Then visit `http://127.0.0.1:8765`.
+
+PaperWatch creates a clean `config.toml` automatically on first run. It does not ship with any API keys or Feishu webhook. Fetching papers and calling AI/translation APIs also require outbound HTTPS access to the selected services.
 
 ## Fast Setup In The UI
 
@@ -264,13 +272,20 @@ keywords = [
   "diffusion model",
   "flow matching"
 ]
+keyword_weights = {
+  "image generation" = 2.5,
+  "video generation" = 2.0,
+  "text-to-image" = 1.5,
+  "diffusion model" = 1.5,
+  "flow matching" = 1.0
+}
 negative_keywords = [
   "medical image segmentation",
   "classification only"
 ]
 ```
 
-The local ranker uses keyword matches, category matches, and negative keywords. For configured interests with keywords, PaperWatch requires real keyword evidence so unrelated papers from a broad source query are less likely to appear.
+The local ranker uses keyword matches, keyword weights, category matches, and negative keywords. In the UI, edit keywords as `keyword | weight`, one per line. Higher weights make a keyword count more strongly in ranking; omitted weights default to `1.0`. For configured interests with keywords, PaperWatch requires real keyword evidence so unrelated papers from a broad source query are less likely to appear.
 
 The Config page supports adding, editing, deleting, and AI-building interests.
 

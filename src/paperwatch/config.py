@@ -133,6 +133,7 @@ keywords = [
   "consistency model",
   "latent diffusion"
 ]
+keyword_weights = {}
 negative_keywords = [
   "medical image segmentation",
   "object detection only",
@@ -285,10 +286,12 @@ def copy_default_config_if_missing(source: str | Path, dest: str | Path) -> None
 
 
 def _parse_interest(item: dict[str, Any]) -> Interest:
+    keywords = _parse_keywords(item.get("keywords", []))
     return Interest(
         name=str(item["name"]),
         description=str(item.get("description", "")),
-        keywords=[str(x) for x in item.get("keywords", [])],
+        keywords=keywords,
+        keyword_weights=_parse_keyword_weights(item.get("keyword_weights", {}), keywords),
         negative_keywords=[str(x) for x in item.get("negative_keywords", [])],
         arxiv_categories=[str(x) for x in item.get("arxiv_categories", [])],
         seed_papers=[str(x) for x in item.get("seed_papers", [])],
@@ -298,6 +301,38 @@ def _parse_interest(item: dict[str, Any]) -> Interest:
 def _parse_optional_positive_int(value: Any) -> int | None:
     parsed = int(value)
     return parsed if parsed > 0 else None
+
+
+def _parse_keywords(value: Any) -> list[str]:
+    result: list[str] = []
+    if not isinstance(value, list):
+        return result
+    for item in value:
+        if isinstance(item, dict):
+            text = str(item.get("term", item.get("keyword", ""))).strip()
+        else:
+            text = str(item).strip()
+        if text:
+            result.append(text)
+    return result
+
+
+def _parse_keyword_weights(value: Any, keywords: list[str]) -> dict[str, float]:
+    weights: dict[str, float] = {}
+    if isinstance(value, dict):
+        for key, raw_weight in value.items():
+            term = str(key).strip()
+            if not term:
+                continue
+            try:
+                weight = float(raw_weight)
+            except (TypeError, ValueError):
+                continue
+            if weight > 0:
+                weights[term] = weight
+    for keyword in keywords:
+        weights.setdefault(keyword, 1.0)
+    return weights
 
 
 def _parse_hour(value: Any) -> int:

@@ -9,6 +9,7 @@ class Interest:
     name: str
     description: str = ""
     keywords: list[str] = field(default_factory=list)
+    keyword_weights: dict[str, float] = field(default_factory=dict)
     negative_keywords: list[str] = field(default_factory=list)
     arxiv_categories: list[str] = field(default_factory=list)
     seed_papers: list[str] = field(default_factory=list)

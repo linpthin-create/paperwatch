@@ -54,10 +54,11 @@ def score_paper(paper: Paper, interest: Interest) -> ScoredPaper:
         needle = keyword.lower()
         if not needle:
             continue
+        weight = max(float(interest.keyword_weights.get(keyword, 1.0)), 0.0)
         if needle in title:
-            counts[keyword] += 5.0
+            counts[keyword] += 5.0 * weight
         if needle in abstract:
-            counts[keyword] += 2.0
+            counts[keyword] += 2.0 * weight
 
     for category in interest.arxiv_categories:
         if category.lower() in categories:

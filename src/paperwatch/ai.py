@@ -203,6 +203,7 @@ def _build_interest_prompt(paper_text: str) -> str:
         "description: one sentence that states the field/domain and the reusable monitoring scope;\n"
         "arxiv_categories: array of arXiv category strings;\n"
         "keywords: 12 to 24 precise English keyword phrases covering domain terms, problem-family terms, method terms, and dataset/evaluation terms when relevant;\n"
+        "keyword_weights: object mapping each keyword to a positive number. Use 2.0-3.0 for core domain/problem keywords, 1.0-1.5 for useful supporting terms, and 0.5-0.8 for broad recall terms;\n"
         "negative_keywords: 0 to 8 phrases for obvious false positives;\n"
         "seed_papers: array, include the given title if present.\n"
         "Prefer useful search keywords over overly broad words, but include the true parent field when it is needed to retrieve future work.\n"
@@ -267,6 +268,7 @@ def _interest_payload_to_toml(payload: dict) -> str:
             f"arxiv_categories = {_toml_list(payload.get('arxiv_categories', []))}",
             f"seed_papers = {_toml_list(payload.get('seed_papers', []))}",
             f"keywords = {_toml_list(payload.get('keywords', []))}",
+            f"keyword_weights = {_toml_number_map(payload.get('keyword_weights', {}), payload.get('keywords', []))}",
             f"negative_keywords = {_toml_list(payload.get('negative_keywords', []))}",
             "",
         ]
@@ -275,6 +277,23 @@ def _interest_payload_to_toml(payload: dict) -> str:
 
 def _toml_list(values) -> str:
     return "[" + ", ".join(f'"{_toml_escape(str(value))}"' for value in values) + "]"
+
+
+def _toml_number_map(values, keywords) -> str:
+    if not isinstance(values, dict):
+        values = {}
+    parts = []
+    for keyword in keywords:
+        key = str(keyword)
+        raw_weight = values.get(key, 1.0)
+        try:
+            weight = float(raw_weight)
+        except (TypeError, ValueError):
+            weight = 1.0
+        if weight <= 0:
+            weight = 1.0
+        parts.append(f'"{_toml_escape(key)}" = {weight:g}')
+    return "{ " + ", ".join(parts) + " }"
 
 
 def _toml_escape(value: str) -> str:

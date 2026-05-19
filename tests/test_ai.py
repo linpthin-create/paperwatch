@@ -44,12 +44,14 @@ class AiInsightTest(unittest.TestCase):
         payload = _parse_interest_payload(
             '{"name":"Test Direction","description":"A test direction.","arxiv_categories":["cs.CV"],'
             '"keywords":["diffusion model","image generation"],"negative_keywords":["segmentation"],'
+            '"keyword_weights":{"diffusion model":2.5,"image generation":1.5},'
             '"seed_papers":["A Paper Title"]}'
         )
         toml = _interest_payload_to_toml(payload)
         self.assertIn("[[interests]]", toml)
         self.assertIn('name = "Test Direction"', toml)
         self.assertIn('"diffusion model"', toml)
+        self.assertIn('keyword_weights = { "diffusion model" = 2.5, "image generation" = 1.5 }', toml)
 
     def test_build_interest_prompt_keeps_large_text_budget(self):
         prompt = _build_interest_prompt("x" * 60000)
@@ -59,6 +61,7 @@ class AiInsightTest(unittest.TestCase):
         prompt = _build_interest_prompt("paper")
         self.assertIn("stable research area", prompt)
         self.assertIn("not just the exact method", prompt)
+        self.assertIn("keyword_weights", prompt)
 
     def test_generate_translations_batches_all_selected_papers(self):
         items = [

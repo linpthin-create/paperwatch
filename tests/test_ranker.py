@@ -49,6 +49,22 @@ class KeywordRankerTest(unittest.TestCase):
         scored = score_paper(paper, interest)
         self.assertLess(scored.score, 0)
 
+    def test_keyword_weights_scale_matches(self):
+        paper = Paper(
+            source="arxiv",
+            paper_id="2601.00005",
+            title="A Diffusion Model",
+            authors=["A. Researcher"],
+            abstract="A diffusion model for generation.",
+            published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            updated_at=None,
+            url="https://arxiv.org/abs/2601.00005",
+            categories=[],
+        )
+        base = Interest(name="Base", keywords=["diffusion model"])
+        weighted = Interest(name="Weighted", keywords=["diffusion model"], keyword_weights={"diffusion model": 2.0})
+        self.assertGreater(score_paper(paper, weighted).score, score_paper(paper, base).score)
+
     def test_score_papers_by_interest_keeps_independent_lists(self):
         paper = Paper(
             source="arxiv",

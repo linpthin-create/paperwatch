@@ -723,7 +723,16 @@ INDEX_HTML = r"""<!doctype html>
     .digest-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; margin-bottom: 6px; }
     .list button { width: 100%; text-align: left; margin-bottom: 6px; overflow-wrap: anywhere; }
     .digest-row button { margin-bottom: 0; }
-    pre { white-space: pre-wrap; background: #f8fafc; border: 1px solid #d8dee6; border-radius: 6px; padding: 12px; max-height: 620px; overflow: auto; }
+    .markdown-preview { background: #f8fafc; border: 1px solid #d8dee6; border-radius: 6px; padding: 12px 18px; max-height: 620px; overflow: auto; line-height: 1.5; }
+    .markdown-preview h1, .markdown-preview h2, .markdown-preview h3 { color: #16324f; margin: 14px 0 8px; }
+    .markdown-preview h1 { font-size: 24px; }
+    .markdown-preview h2 { font-size: 19px; border-bottom: 1px solid #d8dee6; padding-bottom: 4px; }
+    .markdown-preview h3 { font-size: 16px; }
+    .markdown-preview p { margin: 8px 0; }
+    .markdown-preview ul, .markdown-preview ol { margin: 8px 0 8px 24px; padding: 0; }
+    .markdown-preview li { margin: 4px 0; }
+    .markdown-preview code { background: #eef2f6; border-radius: 4px; padding: 1px 4px; }
+    .markdown-preview a { color: #2364aa; }
     article { border-top: 1px solid #e1e6ec; padding: 12px 0; }
     article h3 { margin: 0 0 6px; font-size: 16px; }
     .muted { color: #64748b; font-size: 13px; }
@@ -811,7 +820,7 @@ INDEX_HTML = r"""<!doctype html>
             <button class="danger" id="digest-delete-button" onclick="deleteCurrentDigest()" disabled>Delete</button>
           </span>
         </div>
-        <pre id="digest-content">Select a digest.</pre>
+        <div id="digest-content" class="markdown-preview">Select a digest.</div>
       </div>
       <div id="view-config" hidden>
         <div class="toolbar">
@@ -881,7 +890,7 @@ INDEX_HTML = r"""<!doctype html>
                 <div class="field"><label>arXiv categories (comma separated)</label><input id="interest-edit-categories"></div>
               </div>
             </div>
-            <div class="field"><label>Keywords (one per line)</label><textarea id="interest-edit-keywords" style="min-height:120px"></textarea></div>
+            <div class="field"><label>Keywords (one per line: keyword | weight)</label><textarea id="interest-edit-keywords" style="min-height:120px"></textarea></div>
             <div class="field"><label>Negative keywords (one per line)</label><textarea id="interest-edit-negative" style="min-height:80px"></textarea></div>
             <div class="field"><label>Seed papers (one per line)</label><textarea id="interest-edit-seeds" style="min-height:70px"></textarea></div>
             <div class="row">
@@ -1008,7 +1017,7 @@ INDEX_HTML = r"""<!doctype html>
       const data = await getJson('/api/digest?name=' + encodeURIComponent(name));
       currentDigest = name;
       document.getElementById('digest-title').textContent = name;
-      document.getElementById('digest-content').textContent = data.content || 'Empty digest.';
+      renderDigest(data.content || 'Empty digest.');
       document.getElementById('digest-send-button').disabled = false;
       document.getElementById('digest-delete-button').disabled = false;
     }
@@ -1063,7 +1072,7 @@ INDEX_HTML = r"""<!doctype html>
       if (currentDigest === name) {
         currentDigest = '';
         document.getElementById('digest-title').textContent = 'Select a digest';
-        document.getElementById('digest-content').textContent = 'Deleted ' + name;
+        renderDigest('Deleted ' + name);
         document.getElementById('digest-send-button').disabled = true;
         document.getElementById('digest-delete-button').disabled = true;
       }
@@ -1080,6 +1089,74 @@ INDEX_HTML = r"""<!doctype html>
     async function sendDigestFeishu(name) {
       const data = await postJson('/api/send-digest-feishu', {name});
       document.getElementById('run-status').textContent = data.ok ? `Sent ${name} to Feishu.` : `Feishu send failed: ${data.error || data.message}`;
+    }
+    function renderDigest(markdown) {
+      document.getElementById('digest-content').innerHTML = markdownToHtml(markdown);
+    }
+    function markdownToHtml(markdown) {
+      const lines = String(markdown || '').split(/\r?\n/);
+      const output = [];
+      let list = null;
+      let paragraph = [];
+      const flushParagraph = () => {
+        if (!paragraph.length) return;
+        output.push('<p>' + inlineMarkdown(paragraph.join(' ')) + '</p>');
+        paragraph = [];
+      };
+      const closeList = () => {
+        if (!list) return;
+        output.push(`</${list}>`);
+        list = null;
+      };
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!line) {
+          flushParagraph();
+          closeList();
+          continue;
+        }
+        const heading = line.match(/^(#{1,3})\s+(.+)$/);
+        if (heading) {
+          flushParagraph();
+          closeList();
+          const level = heading[1].length;
+          output.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+          continue;
+        }
+        const bullet = line.match(/^[-*]\s+(.+)$/);
+        if (bullet) {
+          flushParagraph();
+          if (list !== 'ul') {
+            closeList();
+            output.push('<ul>');
+            list = 'ul';
+          }
+          output.push('<li>' + inlineMarkdown(bullet[1]) + '</li>');
+          continue;
+        }
+        const numbered = line.match(/^\d+\.\s+(.+)$/);
+        if (numbered) {
+          flushParagraph();
+          if (list !== 'ol') {
+            closeList();
+            output.push('<ol>');
+            list = 'ol';
+          }
+          output.push('<li>' + inlineMarkdown(numbered[1]) + '</li>');
+          continue;
+        }
+        closeList();
+        paragraph.push(line);
+      }
+      flushParagraph();
+      closeList();
+      return output.join('\n');
+    }
+    function inlineMarkdown(value) {
+      return htmlEscape(value)
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
     }
     function syncRunMode() {
       const mode = document.getElementById('run-mode').value;
@@ -1393,6 +1470,7 @@ INDEX_HTML = r"""<!doctype html>
           categories: readTomlArrayFlexible(block, 'arxiv_categories', []),
           seeds: readTomlArrayFlexible(block, 'seed_papers', []),
           keywords: readTomlArrayFlexible(block, 'keywords', []),
+          keywordWeights: readTomlNumberMap(block, 'keyword_weights', {}),
           negative: readTomlArrayFlexible(block, 'negative_keywords', []),
         };
       });
@@ -1402,6 +1480,16 @@ INDEX_HTML = r"""<!doctype html>
       const m = text.match(re);
       if (!m) return fallback;
       return [...m[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map(x => x[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\'));
+    }
+    function readTomlNumberMap(text, key, fallback={}) {
+      const re = new RegExp('^' + key.replace('.', '\\.') + '\\s*=\\s*\\{([\\s\\S]*?)\\}', 'm');
+      const m = text.match(re);
+      if (!m) return fallback;
+      const result = {};
+      for (const match of m[1].matchAll(/"((?:[^"\\]|\\.)*)"\s*=\s*([0-9]+(?:\.[0-9]+)?)/g)) {
+        result[match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')] = Number(match[2]);
+      }
+      return result;
     }
     function populateSourceChecks(text) {
       const selected = [];
@@ -1443,7 +1531,7 @@ INDEX_HTML = r"""<!doctype html>
       document.getElementById('interest-edit-name').value = item ? item.name : '';
       document.getElementById('interest-edit-description').value = item ? item.description : '';
       document.getElementById('interest-edit-categories').value = item ? item.categories.join(', ') : '';
-      document.getElementById('interest-edit-keywords').value = item ? item.keywords.join('\n') : '';
+      document.getElementById('interest-edit-keywords').value = item ? renderKeywordLines(item.keywords, item.keywordWeights) : '';
       document.getElementById('interest-edit-negative').value = item ? item.negative.join('\n') : '';
       document.getElementById('interest-edit-seeds').value = item ? item.seeds.join('\n') : '';
     }
@@ -1461,6 +1549,7 @@ INDEX_HTML = r"""<!doctype html>
         categories: ['cs.CV'],
         seeds: [],
         keywords: [],
+        keywordWeights: {},
         negative: [],
       });
       const editor = document.getElementById('config-editor');
@@ -1488,7 +1577,7 @@ INDEX_HTML = r"""<!doctype html>
         description: document.getElementById('interest-edit-description').value.trim(),
         categories: csvValues(document.getElementById('interest-edit-categories').value),
         seeds: lineValues(document.getElementById('interest-edit-seeds').value),
-        keywords: lineValues(document.getElementById('interest-edit-keywords').value),
+        ...parseKeywordLines(document.getElementById('interest-edit-keywords').value),
         negative: lineValues(document.getElementById('interest-edit-negative').value),
       });
       let text = replaceInterestBlock(document.getElementById('config-editor').value, index, block);
@@ -1531,8 +1620,35 @@ INDEX_HTML = r"""<!doctype html>
         `arxiv_categories = ${renderTomlArray(item.categories)}`,
         `seed_papers = ${renderTomlArray(item.seeds)}`,
         `keywords = ${renderTomlArray(item.keywords)}`,
+        `keyword_weights = ${renderTomlNumberMap(item.keywordWeights, item.keywords)}`,
         `negative_keywords = ${renderTomlArray(item.negative)}`,
       ].join('\n');
+    }
+    function renderKeywordLines(keywords, weights) {
+      return (keywords || []).map(keyword => `${keyword} | ${Number((weights || {})[keyword] || 1)}`).join('\n');
+    }
+    function parseKeywordLines(value) {
+      const keywords = [];
+      const keywordWeights = {};
+      for (const line of String(value).split(/\n+/)) {
+        const raw = line.trim();
+        if (!raw) continue;
+        const parts = raw.split('|');
+        const keyword = parts[0].trim();
+        if (!keyword) continue;
+        const parsed = parts.length > 1 ? Number(parts.slice(1).join('|').trim()) : 1;
+        const weight = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+        if (!keywords.includes(keyword)) keywords.push(keyword);
+        keywordWeights[keyword] = weight;
+      }
+      return {keywords, keywordWeights};
+    }
+    function renderTomlNumberMap(values, keywords) {
+      return '{ ' + (keywords || []).map(keyword => {
+        const raw = Number((values || {})[keyword] || 1);
+        const weight = Number.isFinite(raw) && raw > 0 ? raw : 1;
+        return `"${tomlEscape(keyword)}" = ${weight}`;
+      }).join(', ') + ' }';
     }
     function lineValues(value) {
       return uniqueValues(String(value).split(/\n+/).map(x => x.trim()).filter(Boolean));

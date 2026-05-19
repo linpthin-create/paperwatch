@@ -30,6 +30,7 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.dblp.max_results_per_interest, 40)
         self.assertGreaterEqual(len(settings.interests), 1)
         self.assertIn("CV Model Generation", settings.default_fetch_interests)
+        self.assertEqual(settings.interests[0].keyword_weights["image generation"], 1.0)
 
     def test_zero_per_interest_limit_means_unlimited(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -44,6 +45,18 @@ class ConfigTest(unittest.TestCase):
             path.write_text(DEFAULT_CONFIG.replace("hour = 12", "hour = 25"), encoding="utf-8")
             with self.assertRaises(ValueError):
                 load_settings(path)
+
+    def test_loads_keyword_weights(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.toml"
+            content = DEFAULT_CONFIG.replace(
+                "keyword_weights = {}",
+                'keyword_weights = { "image generation" = 2.5, "diffusion model" = 1.7 }',
+            )
+            path.write_text(content, encoding="utf-8")
+            settings = load_settings(path)
+        self.assertEqual(settings.interests[0].keyword_weights["image generation"], 2.5)
+        self.assertEqual(settings.interests[0].keyword_weights["diffusion model"], 1.7)
 
 
 if __name__ == "__main__":
