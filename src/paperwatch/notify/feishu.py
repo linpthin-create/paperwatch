@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -126,6 +127,9 @@ def load_config(path: Path) -> FeishuConfig | None:
 
 
 def _resolve_config(config: FeishuConfig | None, config_path: Path | None) -> FeishuConfig | None:
+    env_config = load_env_config()
+    if env_config is not None:
+        return env_config
     if config is not None:
         if config.enabled and config.webhook_url.strip():
             return config
@@ -133,6 +137,33 @@ def _resolve_config(config: FeishuConfig | None, config_path: Path | None) -> Fe
             return load_config(config_path or DEFAULT_CONFIG_PATH)
         return None
     return load_config(config_path or DEFAULT_CONFIG_PATH)
+
+
+def load_env_config() -> FeishuConfig | None:
+    enabled = os.environ.get("FEISHU_ENABLED", "").strip().lower()
+    webhook_url = os.environ.get("FEISHU_WEBHOOK_URL", "").strip()
+    if enabled in {"0", "false", "no", "off"}:
+        return None
+    if not webhook_url:
+        return None
+    send_on_schedule = os.environ.get("FEISHU_SEND_ON_SCHEDULE", "true").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+    try:
+        timeout_seconds = int(os.environ.get("FEISHU_TIMEOUT_SECONDS", "15"))
+    except ValueError:
+        timeout_seconds = 15
+    return FeishuConfig(
+        enabled=True,
+        send_on_schedule=send_on_schedule,
+        webhook_url=webhook_url,
+        secret=os.environ.get("FEISHU_SECRET", "").strip(),
+        timeout_seconds=max(timeout_seconds, 1),
+        configured=True,
+    )
 
 
 def render_digest_body(notification: DigestNotification) -> str:

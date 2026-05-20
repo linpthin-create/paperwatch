@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from paperwatch.models import FeishuConfig, Paper, ScoredPaper
-from paperwatch.notify.feishu import DigestNotification, load_config, notify_digest, render_digest_body
+from paperwatch.notify.feishu import DigestNotification, load_config, load_env_config, notify_digest, render_digest_body
 
 
 class FeishuNotifyTest(unittest.TestCase):
@@ -122,6 +122,46 @@ class FeishuNotifyTest(unittest.TestCase):
             )
         self.assertFalse(sent)
         post_json.assert_not_called()
+
+    def test_load_env_config_uses_github_secrets_style_variables(self):
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "FEISHU_ENABLED": "true",
+                "FEISHU_WEBHOOK_URL": "https://open.feishu.cn/open-apis/bot/v2/hook/test",
+                "FEISHU_SECRET": "secret",
+                "FEISHU_SEND_ON_SCHEDULE": "false",
+            },
+            clear=True,
+        ):
+            config = load_env_config()
+        self.assertIsNotNone(config)
+        self.assertEqual(config.webhook_url, "https://open.feishu.cn/open-apis/bot/v2/hook/test")
+        self.assertEqual(config.secret, "secret")
+        self.assertFalse(config.send_on_schedule)
+
+    def test_env_config_takes_precedence_over_disabled_file_config(self):
+        notification = DigestNotification(
+            date_range="2026-01-01 to 2026-01-01",
+            interests=[],
+            ranking_mode="none",
+            mode="scheduled",
+            fetched_count=0,
+            unique_count=0,
+            inserted_count=0,
+            recommendation_count=0,
+            digest_paths=[],
+            top_papers=[],
+        )
+        with mock.patch.dict(
+            "os.environ",
+            {"FEISHU_WEBHOOK_URL": "https://open.feishu.cn/open-apis/bot/v2/hook/test"},
+            clear=True,
+        ):
+            with mock.patch("paperwatch.notify.feishu._post_json") as post_json:
+                sent = notify_digest(notification, config=FeishuConfig(enabled=False, configured=True))
+        self.assertTrue(sent)
+        post_json.assert_called_once()
 
 
 if __name__ == "__main__":

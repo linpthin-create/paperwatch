@@ -447,6 +447,53 @@ For another Mac or PC:
 - Click `Install on this PC`, or run `paperwatch schedule install --config /path/to/config.toml`.
 - macOS launchd install is automated. Linux/Windows currently require using the OS scheduler to run `paperwatch run --config /path/to/config.toml --days N`.
 
+## GitHub Actions Schedule
+
+PaperWatch can also run from GitHub Actions. This is the recommended setup when you want the daily fetch to run even if your local computer is off.
+
+The bundled workflow is:
+
+```text
+.github/workflows/daily-paperwatch.yml
+```
+
+It runs every day at `04:30 UTC`, which is `12:30 Asia/Shanghai`, and can also be started manually from the GitHub Actions page. GitHub scheduled workflows use UTC cron and may be delayed under GitHub Actions load.
+
+The workflow:
+
+- installs PaperWatch,
+- runs `paperwatch run --config config.toml --days 1 --include-sent --no-mark-sent`,
+- deduplicates papers within that run across enabled sources,
+- sends Feishu if Feishu secrets are configured,
+- uploads generated digests as an Actions artifact,
+- commits generated `data/digests/*.md` files back to the repository.
+
+For a private operating repository, add these repository secrets:
+
+```text
+OPENAI_API_KEY
+FEISHU_WEBHOOK_URL
+FEISHU_SECRET
+```
+
+Feishu can be configured entirely from environment variables in GitHub Actions:
+
+```text
+FEISHU_ENABLED=true
+FEISHU_WEBHOOK_URL=...
+FEISHU_SECRET=...
+FEISHU_SEND_ON_SCHEDULE=true
+```
+
+Do not commit API keys or Feishu webhooks to git, even in a private repository. Keep model names, source settings, interests, and non-secret routing options in `config.toml`; keep credentials in GitHub Secrets.
+
+To view GitHub-generated digests locally:
+
+```bash
+git pull
+paperwatch ui --open
+```
+
 ## Development
 
 Run tests:
