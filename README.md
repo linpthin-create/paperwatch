@@ -45,8 +45,10 @@ PaperWatch creates a clean `config.toml` automatically on first run. It does not
 3. Choose paper `Sources`, such as arXiv, OpenAlex, and dblp.
 4. Optional: configure `Translation API`, `Digest AI API`, `Ranking Embedding API`, and `Interest Builder API`.
 5. Optional: configure `Feishu`.
-6. Optional: configure `Schedule`, then click `Install on this PC`.
+6. Optional for macOS-only local scheduling: configure `Schedule`, then click `Install on this PC`.
 7. Click `Run fetch` from the left panel to generate a report immediately.
+
+For always-on scheduling across operating systems, use the GitHub Actions workflow instead of `Install on this PC`.
 
 ## Features
 
@@ -444,8 +446,8 @@ For another Mac or PC:
 - Install the wheel or source package.
 - Copy or recreate `config.toml` without leaking API keys.
 - Open the UI, confirm Config -> Schedule and Config -> Feishu.
-- Click `Install on this PC`, or run `paperwatch schedule install --config /path/to/config.toml`.
-- macOS launchd install is automated. Linux/Windows currently require using the OS scheduler to run `paperwatch run --config /path/to/config.toml --days N`.
+- On macOS, click `Install on this PC`, or run `paperwatch schedule install --config /path/to/config.toml`.
+- On Linux/Windows, use GitHub Actions or the operating system scheduler to run `paperwatch run --config /path/to/config.toml --days N`.
 
 ## GitHub Actions Schedule
 
@@ -458,6 +460,32 @@ The bundled workflow is:
 ```
 
 It runs every day at `04:30 UTC`, which is `12:30 Asia/Shanghai`, and can also be started manually from the GitHub Actions page. GitHub scheduled workflows use UTC cron and may be delayed under GitHub Actions load.
+
+GitHub Actions ignores the local `[schedule]` block in `config.toml`. To change the GitHub run time, edit the cron line in `.github/workflows/daily-paperwatch.yml`:
+
+```yaml
+on:
+  schedule:
+    - cron: "30 4 * * *" # 12:30 Asia/Shanghai
+```
+
+Common Asia/Shanghai times:
+
+```text
+08:00 Asia/Shanghai -> 00:00 UTC -> cron: "0 0 * * *"
+09:00 Asia/Shanghai -> 01:00 UTC -> cron: "0 1 * * *"
+12:30 Asia/Shanghai -> 04:30 UTC -> cron: "30 4 * * *"
+18:00 Asia/Shanghai -> 10:00 UTC -> cron: "0 10 * * *"
+23:00 Asia/Shanghai -> 15:00 UTC -> cron: "0 15 * * *"
+```
+
+To change how many days are fetched, edit the command in the same workflow:
+
+```yaml
+run: paperwatch run --config config.toml --days 1 --include-sent --no-mark-sent
+```
+
+For example, `--days 1` means yesterday only; `--days 3` means the last three days.
 
 The workflow:
 
@@ -492,6 +520,23 @@ FEISHU_SEND_ON_SCHEDULE=true
 ```
 
 Do not commit API keys or Feishu webhooks to git, even in a private repository. Keep model names, source settings, interests, and non-secret routing options in `config.toml`; keep credentials in GitHub Secrets.
+
+To sync a locally edited `config.toml` into a private operating repository without committing credentials:
+
+```bash
+scripts/sync_private_config.sh /path/to/paperwatch-private config.toml
+```
+
+The script copies `config.toml`, clears `api_key`, `webhook_url`, and `secret` fields, commits the sanitized config in the private repository, and pushes it. Update the actual credentials with GitHub Secrets:
+
+```bash
+gh secret set TRANSLATION_API_KEY --repo YOUR_ACCOUNT/paperwatch-private
+gh secret set DIGEST_AI_API_KEY --repo YOUR_ACCOUNT/paperwatch-private
+gh secret set INTEREST_BUILDER_API_KEY --repo YOUR_ACCOUNT/paperwatch-private
+gh secret set RANKING_API_KEY --repo YOUR_ACCOUNT/paperwatch-private
+gh secret set FEISHU_WEBHOOK_URL --repo YOUR_ACCOUNT/paperwatch-private
+gh secret set FEISHU_SECRET --repo YOUR_ACCOUNT/paperwatch-private
+```
 
 To view GitHub-generated digests locally:
 
