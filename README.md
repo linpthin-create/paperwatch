@@ -311,7 +311,7 @@ Ranking embedding API:
 ```toml
 [embedding]
 api_key = ""
-api_key_env = "OPENAI_API_KEY"
+api_key_env = "RANKING_API_KEY"
 base_url = "https://api.openai.com/v1"
 model = "text-embedding-3-small"
 timeout_seconds = 60
@@ -322,7 +322,7 @@ Digest AI API:
 ```toml
 [digest_ai]
 api_key = ""
-api_key_env = "OPENAI_API_KEY"
+api_key_env = "DIGEST_AI_API_KEY"
 base_url = "https://api.openai.com/v1"
 model = "gpt-4.1-mini"
 language = "Chinese"
@@ -346,7 +346,7 @@ max_papers_per_run = 20
 
 [ai]
 api_key = ""
-api_key_env = "OPENAI_API_KEY"
+api_key_env = "TRANSLATION_API_KEY"
 base_url = "https://api.openai.com/v1"
 model = "gpt-4.1-mini"
 language = "Chinese"
@@ -363,7 +363,7 @@ The Interest Builder has its own API block:
 ```toml
 [interest_ai]
 api_key = ""
-api_key_env = "OPENAI_API_KEY"
+api_key_env = "INTEREST_BUILDER_API_KEY"
 base_url = "https://api.openai.com/v1"
 model = "gpt-4.1-mini"
 timeout_seconds = 90
@@ -472,9 +472,15 @@ For a private operating repository, add these repository secrets:
 
 ```text
 OPENAI_API_KEY
+TRANSLATION_API_KEY
+DIGEST_AI_API_KEY
+INTEREST_BUILDER_API_KEY
+RANKING_API_KEY
 FEISHU_WEBHOOK_URL
 FEISHU_SECRET
 ```
+
+`OPENAI_API_KEY` is kept as a fallback for older configs. The purpose-specific secrets are preferred when you use different providers or keys for translation, digest AI, interest building, and embedding ranking.
 
 Feishu can be configured entirely from environment variables in GitHub Actions:
 

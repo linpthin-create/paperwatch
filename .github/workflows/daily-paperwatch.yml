@@ -26,7 +26,12 @@ jobs:
       - name: Run daily fetch
         run: paperwatch run --config config.toml --days 1 --include-sent --no-mark-sent
         env:
+          # Fallback for configs that still use OPENAI_API_KEY.
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TRANSLATION_API_KEY: ${{ secrets.TRANSLATION_API_KEY || secrets.OPENAI_API_KEY }}
+          DIGEST_AI_API_KEY: ${{ secrets.DIGEST_AI_API_KEY || secrets.OPENAI_API_KEY }}
+          INTEREST_BUILDER_API_KEY: ${{ secrets.INTEREST_BUILDER_API_KEY || secrets.OPENAI_API_KEY }}
+          RANKING_API_KEY: ${{ secrets.RANKING_API_KEY || secrets.OPENAI_API_KEY }}
           FEISHU_ENABLED: "true"
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
           FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
