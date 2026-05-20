@@ -94,6 +94,9 @@ class UiTest(unittest.TestCase):
         self.assertIn("updateConfigNavActive", INDEX_HTML)
         self.assertIn("setConfigNavActive", INDEX_HTML)
         self.assertIn("data-target=\"cfg-auto\"", INDEX_HTML)
+        self.assertIn("data-target=\"cfg-github\"", INDEX_HTML)
+        self.assertIn("syncPrivateConfig", INDEX_HTML)
+        self.assertIn("/api/sync-private-config", INDEX_HTML)
         self.assertIn("scrollConfigModule", INDEX_HTML)
         self.assertIn("cfg-auto", INDEX_HTML)
         self.assertIn("sendCurrentDigestFeishu", INDEX_HTML)
@@ -104,6 +107,47 @@ class UiTest(unittest.TestCase):
         self.assertIn("digest-row", INDEX_HTML)
         self.assertNotIn("Yesterday", INDEX_HTML)
         self.assertNotIn("Preview rerank", INDEX_HTML)
+
+    def test_sync_private_config_runs_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "private"
+            repo.mkdir()
+            (repo / ".git").mkdir()
+            cfg = Path(tmp) / "config.toml"
+            cfg.write_text(
+                DEFAULT_CONFIG.replace('api_key = ""', 'api_key = "secret-key"', 1)
+                .replace('webhook_url = ""', 'webhook_url = "https://example.test/hook"', 1)
+                .replace('secret = ""', 'secret = "signing-secret"', 1),
+                encoding="utf-8",
+            )
+            handler = FakeHandler(cfg)
+
+            with mock.patch.object(handler, "_run_git") as run_git:
+                with mock.patch("paperwatch.ui.subprocess.run", return_value=subprocess_result(returncode=1)):
+                    result = handler._sync_private_config(str(repo))
+
+            self.assertEqual(result["message"], "Private config synced and pushed.")
+            synced = (repo / "config.toml").read_text(encoding="utf-8")
+            self.assertIn('api_key = ""', synced)
+            self.assertIn('webhook_url = ""', synced)
+            self.assertIn('secret = ""', synced)
+            self.assertNotIn("secret-key", synced)
+            self.assertEqual(run_git.call_count, 3)
+
+    def test_sync_private_config_reports_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "private"
+            repo.mkdir()
+            (repo / ".git").mkdir()
+            cfg = Path(tmp) / "config.toml"
+            cfg.write_text(DEFAULT_CONFIG, encoding="utf-8")
+            handler = FakeHandler(cfg)
+
+            with mock.patch.object(handler, "_run_git", side_effect=RuntimeError("push failed")):
+                with self.assertRaises(RuntimeError) as raised:
+                    handler._sync_private_config(str(repo))
+
+            self.assertIn("push failed", str(raised.exception))
 
     def test_serve_ui_accepts_open_browser_argument(self):
         import inspect
@@ -162,3 +206,7 @@ class UiTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def subprocess_result(returncode=0, stdout="", stderr=""):
+    return mock.Mock(returncode=returncode, stdout=stdout, stderr=stderr)

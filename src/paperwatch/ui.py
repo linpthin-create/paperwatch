@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -159,6 +160,13 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, **result})
             except RuntimeError as exc:
                 self._send_json({"ok": False, "error": str(exc)})
+        elif parsed.path == "/api/sync-private-config":
+            body = self._read_json()
+            try:
+                result = self._sync_private_config(str(body.get("repo_path", "")))
+                self._send_json({"ok": True, **result})
+            except RuntimeError as exc:
+                self._send_json({"ok": False, "error": str(exc)})
         elif parsed.path == "/api/generate-interest":
             from paperwatch.ai import generate_interest_from_paper
 
@@ -277,6 +285,32 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
         if action == "status":
             return {"message": "Schedule status loaded.", "status": schedule_status(self.config_path, settings)}
         raise RuntimeError(f"unknown schedule action: {action}")
+
+    def _sync_private_config(self, repo_path: str) -> dict:
+        repo = Path(repo_path or os.environ.get("PAPERWATCH_PRIVATE_REPO", "/private/tmp/paperwatch-private")).expanduser()
+        if not (repo / ".git").exists():
+            raise RuntimeError(f"Private repository path is not a git checkout: {repo}")
+        content = self.config_path.read_text(encoding="utf-8")
+        content = re.sub(r'api_key = "[^"]*"', 'api_key = ""', content)
+        content = re.sub(r'webhook_url = "[^"]*"', 'webhook_url = ""', content)
+        content = re.sub(r'secret = "[^"]*"', 'secret = ""', content)
+        target = repo / "config.toml"
+        target.write_text(content, encoding="utf-8")
+
+        self._run_git(repo, ["add", "config.toml"])
+        diff = subprocess.run(["git", "-C", str(repo), "diff", "--cached", "--quiet"], capture_output=True, text=True, timeout=30)
+        if diff.returncode == 0:
+            return {"message": "No config changes to sync."}
+        if diff.returncode != 1:
+            raise RuntimeError((diff.stdout + diff.stderr).strip() or "git diff failed")
+        self._run_git(repo, ["commit", "-m", "Update private PaperWatch config"])
+        self._run_git(repo, ["push"])
+        return {"message": "Private config synced and pushed."}
+
+    def _run_git(self, repo: Path, args: list[str]) -> None:
+        result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=120)
+        if result.returncode != 0:
+            raise RuntimeError((result.stdout + result.stderr).strip() or f"git {' '.join(args)} failed")
 
     def _read_json(self) -> dict:
         length = int(self.headers.get("Content-Length", "0"))
@@ -803,6 +837,7 @@ INDEX_HTML = r"""<!doctype html>
         <div class="config-nav">
           <button data-target="cfg-auto" onclick="scrollConfigModule('cfg-auto')">Automatic Fetch</button>
           <button data-target="cfg-schedule" onclick="scrollConfigModule('cfg-schedule')">Schedule</button>
+          <button data-target="cfg-github" onclick="scrollConfigModule('cfg-github')">GitHub Actions</button>
           <button data-target="cfg-feishu" onclick="scrollConfigModule('cfg-feishu')">Feishu</button>
           <button data-target="cfg-sources" onclick="scrollConfigModule('cfg-sources')">Sources</button>
           <button data-target="cfg-interests" onclick="scrollConfigModule('cfg-interests')">Interests</button>
@@ -838,7 +873,7 @@ INDEX_HTML = r"""<!doctype html>
           </div>
           <div class="form-block" id="cfg-schedule">
             <h3>Schedule</h3>
-            <p class="module-help">Configure the local automatic fetch time, then install it on this machine. Each PC needs one local install.</p>
+            <p class="module-help">macOS-only local launchd schedule. For Windows, Linux, or always-on runs, use GitHub Actions below.</p>
             <div class="form-grid">
               <div class="field"><label>Enable scheduled fetch</label><select id="cfg-schedule-enabled"><option value="true">true</option><option value="false">false</option></select></div>
               <div class="field"><label>Fetch days per run</label><input id="cfg-schedule-days" type="number" min="1"></div>
@@ -850,6 +885,18 @@ INDEX_HTML = r"""<!doctype html>
               <button class="subtle" onclick="scheduleAction('status')">Status</button>
               <button class="danger" onclick="scheduleAction('uninstall')">Uninstall</button>
               <span class="muted" id="schedule-status"></span>
+            </div>
+          </div>
+          <div class="form-block" id="cfg-github">
+            <h3>GitHub Actions</h3>
+            <p class="module-help">Sync the current config to a private repository. Credentials are stripped; update API keys and Feishu values in GitHub Secrets.</p>
+            <div class="form-grid">
+              <div class="field"><label>Private repo path</label><input id="cfg-private-repo-path" value="/private/tmp/paperwatch-private"></div>
+              <div class="field"><label>Current workflow time</label><input value="12:30 Asia/Shanghai / 04:30 UTC / cron 30 4 * * *" disabled></div>
+            </div>
+            <div class="row">
+              <button class="primary" onclick="syncPrivateConfig()">Sync config to private repo</button>
+              <span class="muted" id="private-sync-status"></span>
             </div>
           </div>
           <div class="form-block" id="cfg-feishu">
@@ -1007,6 +1054,24 @@ INDEX_HTML = r"""<!doctype html>
         status.textContent = 'Saved.';
         await loadConfig();
       } catch (e) { status.textContent = 'Save failed: ' + e; }
+    }
+    async function syncPrivateConfig() {
+      if (configMode === 'form') applyConfigForm();
+      const status = document.getElementById('private-sync-status');
+      status.textContent = 'Saving and syncing...';
+      try {
+        await postJson('/api/config', {content: document.getElementById('config-editor').value});
+        const data = await postJson('/api/sync-private-config', {
+          repo_path: document.getElementById('cfg-private-repo-path').value
+        });
+        if (!data.ok) {
+          status.textContent = 'Failed: ' + (data.error || 'unknown error');
+          return;
+        }
+        status.textContent = data.message || 'Synced.';
+      } catch (e) {
+        status.textContent = 'Failed: ' + e;
+      }
     }
     async function loadDigests() {
       const data = await getJson('/api/digests');

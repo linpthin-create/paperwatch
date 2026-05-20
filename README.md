@@ -527,7 +527,9 @@ To sync a locally edited `config.toml` into a private operating repository witho
 scripts/sync_private_config.sh /path/to/paperwatch-private config.toml
 ```
 
-The script copies `config.toml`, clears `api_key`, `webhook_url`, and `secret` fields, commits the sanitized config in the private repository, and pushes it. Update the actual credentials with GitHub Secrets:
+The same action is available in the Web UI: Config -> GitHub Actions -> `Sync config to private repo`.
+
+The script and Web UI button copy `config.toml`, clear `api_key`, `webhook_url`, and `secret` fields, commit the sanitized config in the private repository, and push it. Update the actual credentials with GitHub Secrets:
 
 ```bash
 gh secret set TRANSLATION_API_KEY --repo YOUR_ACCOUNT/paperwatch-private
