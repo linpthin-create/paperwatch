@@ -1481,18 +1481,41 @@ INDEX_HTML = r"""<!doctype html>
       return '[' + values.map(value => `"${tomlEscape(value)}"`).join(', ') + ']';
     }
     function section(text, name) {
-      const re = new RegExp('^\\[' + name.replace('.', '\\.') + '\\]\\s*\\n([\\s\\S]*?)(?=^\\[|$)', 'm');
-      const m = text.match(re);
-      return m ? m[1] : '';
+      const lines = String(text || '').split(/\r?\n/);
+      const header = `[${name}]`;
+      const start = lines.findIndex(line => line.trim() === header);
+      if (start < 0) return '';
+      let end = lines.length;
+      for (let i = start + 1; i < lines.length; i++) {
+        if (/^\s*\[/.test(lines[i])) {
+          end = i;
+          break;
+        }
+      }
+      return lines.slice(start + 1, end).join('\n');
     }
     function setInSection(text, sec, key, value, quoted=true) {
-      const block = section(text, sec);
+      const lines = String(text || '').split(/\r?\n/);
+      const header = `[${sec}]`;
       const rendered = quoted ? `${key} = "${tomlEscape(value)}"` : `${key} = ${value}`;
-      if (!block) return text + `\n[${sec}]\n${rendered}\n`;
-      const escapedSec = sec.replace('.', '\\.');
-      const re = new RegExp('(^\\[' + escapedSec + '\\]\\s*\\n[\\s\\S]*?^)' + key + '\\s*=\\s*.*$', 'm');
-      if (re.test(text)) return text.replace(re, `$1${rendered}`);
-      return text.replace(new RegExp('(^\\[' + escapedSec + '\\]\\s*\\n)', 'm'), `$1${rendered}\n`);
+      const start = lines.findIndex(line => line.trim() === header);
+      if (start < 0) return String(text || '') + `\n[${sec}]\n${rendered}\n`;
+      let end = lines.length;
+      for (let i = start + 1; i < lines.length; i++) {
+        if (/^\s*\[/.test(lines[i])) {
+          end = i;
+          break;
+        }
+      }
+      const keyRe = new RegExp('^\\s*' + key.replace('.', '\\.') + '\\s*=');
+      for (let i = start + 1; i < end; i++) {
+        if (keyRe.test(lines[i])) {
+          lines[i] = rendered;
+          return lines.join('\n');
+        }
+      }
+      lines.splice(start + 1, 0, rendered);
+      return lines.join('\n');
     }
     function setRoot(text, key, value, quoted=false) {
       const rendered = quoted ? `${key} = "${value}"` : `${key} = ${value}`;
