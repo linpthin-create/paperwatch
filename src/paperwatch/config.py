@@ -90,6 +90,7 @@ timeout_seconds = 90
 
 [sources.arxiv]
 enabled = true
+fetch_mode = "search"
 max_results_per_interest = 80
 include_cross_list = true
 request_timeout_seconds = 30
@@ -151,6 +152,7 @@ def load_settings(path: str | Path) -> Settings:
     arxiv_raw = sources.get("arxiv", {})
     arxiv = ArxivConfig(
         enabled=bool(arxiv_raw.get("enabled", True)),
+        fetch_mode=str(arxiv_raw.get("fetch_mode", "search")),
         max_results_per_interest=int(arxiv_raw.get("max_results_per_interest", 80)),
         include_cross_list=bool(arxiv_raw.get("include_cross_list", True)),
         request_timeout_seconds=int(arxiv_raw.get("request_timeout_seconds", 30)),

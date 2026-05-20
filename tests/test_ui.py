@@ -102,6 +102,8 @@ class UiTest(unittest.TestCase):
         self.assertIn("/api/send-digest-feishu", INDEX_HTML)
         self.assertIn("Send Feishu", INDEX_HTML)
         self.assertIn("cfg-enabled-sources", INDEX_HTML)
+        self.assertIn("cfg-arxiv-fetch-mode", INDEX_HTML)
+        self.assertIn("OAI daily metadata", INDEX_HTML)
         self.assertIn("OpenAlex", INDEX_HTML)
         self.assertIn("dblp", INDEX_HTML)
         self.assertIn("/api/test-source", INDEX_HTML)

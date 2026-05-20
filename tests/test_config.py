@@ -29,6 +29,7 @@ class ConfigTest(unittest.TestCase):
         self.assertFalse(settings.feishu.enabled)
         self.assertTrue(settings.feishu.send_on_schedule)
         self.assertFalse(settings.openalex.enabled)
+        self.assertEqual(settings.arxiv.fetch_mode, "search")
         self.assertEqual(settings.openalex.max_results_per_interest, 40)
         self.assertFalse(settings.dblp.enabled)
         self.assertEqual(settings.dblp.max_results_per_interest, 40)

@@ -18,6 +18,7 @@ class Interest:
 @dataclass(frozen=True)
 class ArxivConfig:
     enabled: bool = True
+    fetch_mode: str = "search"
     max_results_per_interest: int = 80
     include_cross_list: bool = True
     request_timeout_seconds: int = 30

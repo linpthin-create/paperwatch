@@ -205,11 +205,14 @@ Daily interests are stored in the config as `default_fetch_interests`:
 ```toml
 [sources.arxiv]
 enabled = true
+fetch_mode = "oai_daily"
 max_results_per_interest = 80
 include_cross_list = true
 request_timeout_seconds = 30
 default_fetch_interests = ["CV Model Generation", "Robot Learning"]
 ```
+
+`fetch_mode = "oai_daily"` uses arXiv OAI-PMH to pull daily metadata by date and then filters/ranks locally. `fetch_mode = "search"` uses the arXiv export search API per interest, which can be more prone to HTTP 429 rate limits.
 
 The UI exposes this as a check-list. Selecting several interests generates separate reports in one run.
 
@@ -228,6 +231,7 @@ Enable or disable each source:
 ```toml
 [sources.arxiv]
 enabled = true
+fetch_mode = "oai_daily"
 max_results_per_interest = 80
 include_cross_list = true
 request_timeout_seconds = 30

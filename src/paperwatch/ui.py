@@ -1070,6 +1070,7 @@ INDEX_HTML = r"""<!doctype html>
             <p class="module-help">Enable paper metadata providers and test whether each source is reachable from this machine.</p>
             <div class="form-grid">
               <div class="field"><label>Enabled sources</label><div id="cfg-enabled-sources" class="check-list"></div></div>
+              <div class="field"><label>arXiv fetch mode</label><select id="cfg-arxiv-fetch-mode"><option value="oai_daily">OAI daily metadata</option><option value="search">Search API</option></select></div>
               <div class="field"><label>Max results per interest</label><input id="cfg-arxiv-max" type="number" min="1"></div>
               <div class="field"><label>OpenAlex max results per interest</label><input id="cfg-openalex-max" type="number" min="1"></div>
               <div class="field"><label>OpenAlex mailto (optional)</label><input id="cfg-openalex-mailto"></div>
@@ -1558,6 +1559,7 @@ INDEX_HTML = r"""<!doctype html>
       document.getElementById('cfg-feishu-webhook').value = readTomlString(section(text, 'feishu'), 'webhook_url', '');
       document.getElementById('cfg-feishu-secret').value = readTomlString(section(text, 'feishu'), 'secret', '');
       document.getElementById('cfg-ranking-mode').value = readTomlString(section(text, 'ranking'), 'mode', 'keyword');
+      document.getElementById('cfg-arxiv-fetch-mode').value = readTomlString(section(text, 'sources.arxiv'), 'fetch_mode', 'search');
       document.getElementById('cfg-arxiv-max').value = readTomlNumber(section(text, 'sources.arxiv'), 'max_results_per_interest', '80');
       document.getElementById('cfg-openalex-max').value = readTomlNumber(section(text, 'sources.openalex'), 'max_results_per_interest', '40');
       document.getElementById('cfg-openalex-mailto').value = readTomlString(section(text, 'sources.openalex'), 'mailto', '');
@@ -1601,6 +1603,7 @@ INDEX_HTML = r"""<!doctype html>
       text = setInSection(text, 'feishu', 'timeout_seconds', '15', false);
       text = setInSection(text, 'ranking', 'mode', document.getElementById('cfg-ranking-mode').value);
       text = setInSection(text, 'sources.arxiv', 'max_results_per_interest', document.getElementById('cfg-arxiv-max').value || '80', false);
+      text = setInSection(text, 'sources.arxiv', 'fetch_mode', document.getElementById('cfg-arxiv-fetch-mode').value);
       text = setInSection(text, 'sources.arxiv', 'enabled', checkedValues('cfg-enabled-sources').includes('arxiv') ? 'true' : 'false', false);
       text = setInSection(text, 'sources.openalex', 'enabled', checkedValues('cfg-enabled-sources').includes('openalex') ? 'true' : 'false', false);
       text = setInSection(text, 'sources.openalex', 'max_results_per_interest', document.getElementById('cfg-openalex-max').value || '40', false);

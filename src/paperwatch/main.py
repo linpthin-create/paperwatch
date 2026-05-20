@@ -11,7 +11,7 @@ from paperwatch.notify.feishu import DigestNotification, notify_digest
 from paperwatch.rankers import score_papers_by_interest
 from paperwatch.rankers.embedding import rerank_by_embedding
 from paperwatch.render import write_digest
-from paperwatch.sources import ArxivSource, DblpSource, OpenAlexSource
+from paperwatch.sources import ArxivOaiSource, ArxivSource, DblpSource, OpenAlexSource
 from paperwatch.storage import PaperStore
 from paperwatch.ui import serve_ui
 
@@ -115,22 +115,30 @@ def _run(args: argparse.Namespace) -> int:
     papers = []
     failures = []
     if settings.arxiv.enabled:
-        source = ArxivSource(settings.arxiv)
+        source = _arxiv_source(settings.arxiv)
         if no_rank:
-            print(f"Fetching arXiv: all papers ({start_date} to {end_date})")
+            print(f"Fetching arXiv {settings.arxiv.fetch_mode}: all papers ({start_date} to {end_date})")
             try:
                 papers.extend(source.fetch_all(start_date, end_date))
             except RuntimeError as exc:
                 failures.append(str(exc))
                 print(f"Warning: {exc}", file=sys.stderr)
         else:
-            for interest in selected_interests:
-                print(f"Fetching arXiv: {interest.name} ({start_date} to {end_date})")
+            if settings.arxiv.fetch_mode == "oai_daily":
+                print(f"Fetching arXiv oai_daily: all papers ({start_date} to {end_date})")
                 try:
-                    papers.extend(source.fetch(interest, start_date, end_date))
+                    papers.extend(source.fetch_all(start_date, end_date))
                 except RuntimeError as exc:
                     failures.append(str(exc))
                     print(f"Warning: {exc}", file=sys.stderr)
+            else:
+                for interest in selected_interests:
+                    print(f"Fetching arXiv search: {interest.name} ({start_date} to {end_date})")
+                    try:
+                        papers.extend(source.fetch(interest, start_date, end_date))
+                    except RuntimeError as exc:
+                        failures.append(str(exc))
+                        print(f"Warning: {exc}", file=sys.stderr)
     if settings.openalex.enabled:
         source = OpenAlexSource(settings.openalex)
         if no_rank:
@@ -347,6 +355,14 @@ def _resolve_limit(args: argparse.Namespace, settings) -> int | None:
     if getattr(args, "timestamped", False):
         return None
     return settings.per_interest_limit
+
+
+def _arxiv_source(config):
+    if config.fetch_mode == "oai_daily":
+        return ArxivOaiSource(config)
+    if config.fetch_mode == "search":
+        return ArxivSource(config)
+    raise ValueError(f"unknown arXiv fetch_mode: {config.fetch_mode}")
 
 
 def _select_interests(interests, requested: str | list[str] | None, default_names: list[str]):
