@@ -287,7 +287,10 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
         raise RuntimeError(f"unknown schedule action: {action}")
 
     def _sync_private_config(self, repo_path: str) -> dict:
-        repo = Path(repo_path or os.environ.get("PAPERWATCH_PRIVATE_REPO", "/private/tmp/paperwatch-private")).expanduser()
+        repo = Path(
+            repo_path
+            or os.environ.get("PAPERWATCH_PRIVATE_REPO", "~/Documents/tools/paperwatch-private")
+        ).expanduser()
         if not (repo / ".git").exists():
             raise RuntimeError(f"Private repository path is not a git checkout: {repo}")
         content = self.config_path.read_text(encoding="utf-8")
@@ -891,7 +894,7 @@ INDEX_HTML = r"""<!doctype html>
             <h3>GitHub Actions</h3>
             <p class="module-help">Sync the current config to a private repository. Credentials are stripped; update API keys and Feishu values in GitHub Secrets.</p>
             <div class="form-grid">
-              <div class="field"><label>Private repo path</label><input id="cfg-private-repo-path" value="/private/tmp/paperwatch-private"></div>
+              <div class="field"><label>Private repo path</label><input id="cfg-private-repo-path" value="~/Documents/tools/paperwatch-private"></div>
               <div class="field"><label>Current workflow time</label><input value="12:30 Asia/Shanghai / 04:30 UTC / cron 30 4 * * *" disabled></div>
             </div>
             <div class="row">

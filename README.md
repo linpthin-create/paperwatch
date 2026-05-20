@@ -524,7 +524,7 @@ Do not commit API keys or Feishu webhooks to git, even in a private repository. 
 To sync a locally edited `config.toml` into a private operating repository without committing credentials:
 
 ```bash
-scripts/sync_private_config.sh /path/to/paperwatch-private config.toml
+scripts/sync_private_config.sh ~/Documents/tools/paperwatch-private config.toml
 ```
 
 The same action is available in the Web UI: Config -> GitHub Actions -> `Sync config to private repo`.
