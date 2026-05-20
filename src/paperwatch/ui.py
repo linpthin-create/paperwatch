@@ -276,6 +276,9 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
         start_date = end_date - timedelta(days=7)
         interest = settings.interests[0]
         if target == "arxiv":
+            if settings.arxiv.fetch_mode == "oai_daily":
+                self._test_arxiv_oai()
+                return {"count": 0, "message": "OK: arXiv OAI-PMH endpoint is reachable."}
             source = ArxivSource(replace(settings.arxiv, max_results_per_interest=1, request_timeout_seconds=8))
             try:
                 count = len(source.fetch_query_once(source._build_date_query(start_date, end_date))[:1])
@@ -309,6 +312,20 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             reason = getattr(exc, "reason", exc)
             raise RuntimeError(f"arXiv website check failed: {reason}") from exc
+
+    def _test_arxiv_oai(self) -> None:
+        request = urllib.request.Request(
+            "https://export.arxiv.org/oai2?verb=Identify",
+            headers={"User-Agent": "paperwatch/0.1 (arxiv oai connectivity test)"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                response.read(512)
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(f"arXiv OAI-PMH check failed with HTTP {exc.code}: {exc.reason}") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            reason = getattr(exc, "reason", exc)
+            raise RuntimeError(f"arXiv OAI-PMH check failed: {reason}") from exc
 
     def _schedule_status(self) -> dict:
         from paperwatch.schedule import schedule_status
@@ -1678,7 +1695,7 @@ INDEX_HTML = r"""<!doctype html>
       await postJson('/api/config', {content: document.getElementById('config-editor').value});
       const data = await postJson('/api/test-source', {target});
       status.textContent = data.ok
-        ? (data.warning || `OK: ${target} returned ${data.count} item(s).`)
+        ? (data.warning || data.message || `OK: ${target} returned ${data.count} item(s).`)
         : `Failed: ${data.error}`;
     }
     async function generateInterest() {

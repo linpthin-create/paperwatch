@@ -243,6 +243,18 @@ class UiTest(unittest.TestCase):
             self.assertEqual(result["count"], 0)
             self.assertIn("rate-limited", result["warning"])
 
+    def test_test_arxiv_source_uses_oai_when_configured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.toml"
+            cfg.write_text(DEFAULT_CONFIG.replace('fetch_mode = "search"', 'fetch_mode = "oai_daily"'), encoding="utf-8")
+            handler = FakeHandler(cfg)
+
+            with mock.patch.object(handler, "_test_arxiv_oai") as test_oai:
+                result = handler._test_source(__import__("paperwatch.config").config.load_settings(cfg), "arxiv")
+
+            self.assertIn("OAI-PMH", result["message"])
+            self.assertEqual(test_oai.call_count, 1)
+
     def test_sync_private_config_reports_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / "private"
