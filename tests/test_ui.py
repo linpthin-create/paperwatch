@@ -223,10 +223,23 @@ class UiTest(unittest.TestCase):
             handler = FakeHandler(cfg)
 
             with mock.patch("paperwatch.sources.arxiv.ArxivSource.fetch_query_once", return_value=[]) as fetch:
-                count = handler._test_source(__import__("paperwatch.config").config.load_settings(cfg), "arxiv")
+                result = handler._test_source(__import__("paperwatch.config").config.load_settings(cfg), "arxiv")
 
-            self.assertEqual(count, 0)
+            self.assertEqual(result, {"count": 0})
             self.assertEqual(fetch.call_count, 1)
+
+    def test_test_arxiv_source_reports_export_rate_limit_when_site_reachable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.toml"
+            cfg.write_text(DEFAULT_CONFIG, encoding="utf-8")
+            handler = FakeHandler(cfg)
+
+            with mock.patch("paperwatch.sources.arxiv.ArxivSource.fetch_query_once", side_effect=RuntimeError("arXiv request failed with HTTP 429: Unknown Error")):
+                with mock.patch.object(handler, "_test_arxiv_abs_page"):
+                    result = handler._test_source(__import__("paperwatch.config").config.load_settings(cfg), "arxiv")
+
+            self.assertEqual(result["count"], 0)
+            self.assertIn("rate-limited", result["warning"])
 
     def test_sync_private_config_reports_failure(self):
         with tempfile.TemporaryDirectory() as tmp:

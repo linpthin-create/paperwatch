@@ -157,8 +157,8 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
             body = self._read_json()
             settings = load_settings(self.config_path)
             try:
-                count = self._test_source(settings, str(body.get("target", "arxiv")))
-                self._send_json({"ok": True, "count": count})
+                result = self._test_source(settings, str(body.get("target", "arxiv")))
+                self._send_json({"ok": True, **result})
             except RuntimeError as exc:
                 self._send_json({"ok": False, "error": str(exc)})
         elif parsed.path == "/api/schedule":
@@ -277,14 +277,38 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
         interest = settings.interests[0]
         if target == "arxiv":
             source = ArxivSource(replace(settings.arxiv, max_results_per_interest=1, request_timeout_seconds=8))
-            return len(source.fetch_query_once(source._build_date_query(start_date, end_date))[:1])
+            try:
+                count = len(source.fetch_query_once(source._build_date_query(start_date, end_date))[:1])
+                return {"count": count}
+            except RuntimeError as exc:
+                if "HTTP 429" not in str(exc):
+                    raise
+                self._test_arxiv_abs_page()
+                return {
+                    "count": 0,
+                    "warning": "arXiv site is reachable, but export API is currently rate-limited (HTTP 429). Fetch can fail until the limit clears.",
+                }
         if target == "openalex":
             source = OpenAlexSource(settings.openalex)
-            return len(source.fetch(interest, start_date, end_date)[:1])
+            return {"count": len(source.fetch(interest, start_date, end_date)[:1])}
         if target == "dblp":
             source = DblpSource(settings.dblp)
-            return len(source._fetch_query("machine learning", start_date.year, end_date.year, 1))
+            return {"count": len(source._fetch_query("machine learning", start_date.year, end_date.year, 1))}
         raise RuntimeError(f"unknown source: {target}")
+
+    def _test_arxiv_abs_page(self) -> None:
+        request = urllib.request.Request(
+            "https://arxiv.org/abs/1706.03762",
+            headers={"User-Agent": "paperwatch/0.1 (arxiv connectivity test)"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                response.read(512)
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(f"arXiv website check failed with HTTP {exc.code}: {exc.reason}") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            reason = getattr(exc, "reason", exc)
+            raise RuntimeError(f"arXiv website check failed: {reason}") from exc
 
     def _schedule_status(self) -> dict:
         from paperwatch.schedule import schedule_status
@@ -1650,7 +1674,9 @@ INDEX_HTML = r"""<!doctype html>
       status.textContent = `Testing ${target}...`;
       await postJson('/api/config', {content: document.getElementById('config-editor').value});
       const data = await postJson('/api/test-source', {target});
-      status.textContent = data.ok ? `OK: ${target} returned ${data.count} item(s).` : `Failed: ${data.error}`;
+      status.textContent = data.ok
+        ? (data.warning || `OK: ${target} returned ${data.count} item(s).`)
+        : `Failed: ${data.error}`;
     }
     async function generateInterest() {
       if (configMode === 'form') applyConfigForm();
