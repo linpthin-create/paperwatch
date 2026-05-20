@@ -435,7 +435,7 @@ def _replace_daily_cron(content: str, cron: str, comment: str) -> str:
 
 def _preserve_nonempty_api_routing(new_content: str, old_content: str) -> str:
     for section_name in ("embedding", "ai", "digest_ai", "interest_ai"):
-        for key in ("base_url", "model", "api_key_env"):
+        for key in ("base_url", "model"):
             new_value = _read_toml_string_value(new_content, section_name, key)
             old_value = _read_toml_string_value(old_content, section_name, key)
             if new_value == "" and old_value:

@@ -284,7 +284,7 @@ class UiTest(unittest.TestCase):
         new = '[embedding]\napi_key_env = ""\nbase_url = ""\nmodel = ""\n'
         old = '[embedding]\napi_key_env = "RANKING_API_KEY"\nbase_url = "https://example.test/v1"\nmodel = "m"\n'
         merged = _preserve_nonempty_api_routing(new, old)
-        self.assertIn('api_key_env = "RANKING_API_KEY"', merged)
+        self.assertIn('api_key_env = ""', merged)
         self.assertIn('base_url = "https://example.test/v1"', merged)
         self.assertIn('model = "m"', merged)
 
