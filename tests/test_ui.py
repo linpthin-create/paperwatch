@@ -131,6 +131,14 @@ class UiTest(unittest.TestCase):
         self.assertIn("digest-row", INDEX_HTML)
         self.assertNotIn("Yesterday", INDEX_HTML)
         self.assertNotIn("Preview rerank", INDEX_HTML)
+        self.assertIn("section(text, name)", INDEX_HTML)
+        self.assertIn("name.replace('.', '\\\\.')", INDEX_HTML)
+
+    def test_section_parser_does_not_match_comment_mentions(self):
+        from paperwatch.ui import INDEX_HTML
+
+        self.assertIn("^\\\\[", INDEX_HTML)
+        self.assertIn("(?=^\\\\[|$)", INDEX_HTML)
 
     def test_sync_private_config_runs_script(self):
         with tempfile.TemporaryDirectory() as tmp:

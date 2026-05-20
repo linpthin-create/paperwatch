@@ -1481,7 +1481,7 @@ INDEX_HTML = r"""<!doctype html>
       return '[' + values.map(value => `"${tomlEscape(value)}"`).join(', ') + ']';
     }
     function section(text, name) {
-      const re = new RegExp('\\[' + name + '\\]([\\s\\S]*?)(?=\\n\\[|$)');
+      const re = new RegExp('^\\[' + name.replace('.', '\\.') + '\\]\\s*\\n([\\s\\S]*?)(?=^\\[|$)', 'm');
       const m = text.match(re);
       return m ? m[1] : '';
     }
@@ -1489,9 +1489,10 @@ INDEX_HTML = r"""<!doctype html>
       const block = section(text, sec);
       const rendered = quoted ? `${key} = "${tomlEscape(value)}"` : `${key} = ${value}`;
       if (!block) return text + `\n[${sec}]\n${rendered}\n`;
-      const re = new RegExp('(\\[' + sec + '\\][\\s\\S]*?^)' + key + '\\s*=\\s*.*$', 'm');
+      const escapedSec = sec.replace('.', '\\.');
+      const re = new RegExp('(^\\[' + escapedSec + '\\]\\s*\\n[\\s\\S]*?^)' + key + '\\s*=\\s*.*$', 'm');
       if (re.test(text)) return text.replace(re, `$1${rendered}`);
-      return text.replace(new RegExp('(\\[' + sec + '\\]\\n)'), `$1${rendered}\n`);
+      return text.replace(new RegExp('(^\\[' + escapedSec + '\\]\\s*\\n)', 'm'), `$1${rendered}\n`);
     }
     function setRoot(text, key, value, quoted=false) {
       const rendered = quoted ? `${key} = "${value}"` : `${key} = ${value}`;
