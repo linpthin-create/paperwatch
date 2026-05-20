@@ -306,10 +306,12 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
     def _sync_private_config(self, repo_path: str) -> dict:
         repo = self._private_repo(repo_path)
         content = self.config_path.read_text(encoding="utf-8")
+        target = repo / "config.toml"
+        if target.exists():
+            content = _preserve_nonempty_api_routing(content, target.read_text(encoding="utf-8"))
         content = re.sub(r'api_key = "[^"]*"', 'api_key = ""', content)
         content = re.sub(r'webhook_url = "[^"]*"', 'webhook_url = ""', content)
         content = re.sub(r'secret = "[^"]*"', 'secret = ""', content)
-        target = repo / "config.toml"
         target.write_text(content, encoding="utf-8")
 
         self._run_git(repo, ["add", "config.toml"])
@@ -427,6 +429,36 @@ def _replace_daily_cron(content: str, cron: str, comment: str) -> str:
     if count != 1:
         raise RuntimeError("Could not update daily cron in workflow")
     return updated
+
+
+def _preserve_nonempty_api_routing(new_content: str, old_content: str) -> str:
+    for section_name in ("embedding", "ai", "digest_ai", "interest_ai"):
+        for key in ("base_url", "model", "api_key_env"):
+            new_value = _read_toml_string_value(new_content, section_name, key)
+            old_value = _read_toml_string_value(old_content, section_name, key)
+            if new_value == "" and old_value:
+                new_content = _set_toml_string_value(new_content, section_name, key, old_value)
+    return new_content
+
+
+def _read_toml_string_value(content: str, section_name: str, key: str) -> str | None:
+    match = re.search(rf'^\[{re.escape(section_name)}\]([\s\S]*?)(?=^\[|\Z)', content, flags=re.MULTILINE)
+    if not match:
+        return None
+    key_match = re.search(rf'^{re.escape(key)}\s*=\s*"([^"]*)"', match.group(1), flags=re.MULTILINE)
+    return key_match.group(1) if key_match else None
+
+
+def _set_toml_string_value(content: str, section_name: str, key: str, value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    pattern = rf'(^\[{re.escape(section_name)}\][\s\S]*?^){re.escape(key)}\s*=\s*"[^"]*"'
+    replacement = rf'\1{key} = "{escaped}"'
+    updated, count = re.subn(pattern, replacement, content, count=1, flags=re.MULTILINE)
+    if count:
+        return updated
+    section_pattern = rf'(^\[{re.escape(section_name)}\]\n)'
+    updated, count = re.subn(section_pattern, rf'\1{key} = "{escaped}"\n', content, count=1, flags=re.MULTILINE)
+    return updated if count else content
 
 
 def _utc_to_shanghai(hour: int, minute: int) -> tuple[int, int]:

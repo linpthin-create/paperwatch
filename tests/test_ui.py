@@ -10,6 +10,7 @@ from paperwatch.ui import (
     _extract_arxiv_ids,
     _fetch_arxiv_record,
     _parse_daily_cron,
+    _preserve_nonempty_api_routing,
     _replace_daily_cron,
     _resolve_interest_builder_input,
     _shanghai_to_utc,
@@ -143,6 +144,32 @@ class UiTest(unittest.TestCase):
             self.assertNotIn("secret-key", synced)
             self.assertEqual(run_git.call_count, 3)
 
+    def test_sync_private_config_preserves_existing_api_routing_when_local_blank(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "private"
+            repo.mkdir()
+            (repo / ".git").mkdir()
+            (repo / "config.toml").write_text(
+                DEFAULT_CONFIG.replace('base_url = "https://api.openai.com/v1"', 'base_url = "https://example.test/v1"', 1)
+                .replace('model = "text-embedding-3-small"', 'model = "embedding-model"', 1),
+                encoding="utf-8",
+            )
+            cfg = Path(tmp) / "config.toml"
+            cfg.write_text(
+                DEFAULT_CONFIG.replace('base_url = "https://api.openai.com/v1"', 'base_url = ""', 1)
+                .replace('model = "text-embedding-3-small"', 'model = ""', 1),
+                encoding="utf-8",
+            )
+            handler = FakeHandler(cfg)
+
+            with mock.patch.object(handler, "_run_git"):
+                with mock.patch("paperwatch.ui.subprocess.run", return_value=subprocess_result(returncode=1)):
+                    handler._sync_private_config(str(repo))
+
+            synced = (repo / "config.toml").read_text(encoding="utf-8")
+            self.assertIn('base_url = "https://example.test/v1"', synced)
+            self.assertIn('model = "embedding-model"', synced)
+
     def test_sync_private_config_reports_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / "private"
@@ -206,6 +233,14 @@ class UiTest(unittest.TestCase):
         self.assertEqual(_shanghai_to_utc(23, 0), (15, 0))
         updated = _replace_daily_cron(content, "0 1 * * *", "09:00 Asia/Shanghai")
         self.assertIn('cron: "0 1 * * *" # 09:00 Asia/Shanghai', updated)
+
+    def test_preserve_nonempty_api_routing_keeps_old_when_new_blank(self):
+        new = '[embedding]\napi_key_env = ""\nbase_url = ""\nmodel = ""\n'
+        old = '[embedding]\napi_key_env = "RANKING_API_KEY"\nbase_url = "https://example.test/v1"\nmodel = "m"\n'
+        merged = _preserve_nonempty_api_routing(new, old)
+        self.assertIn('api_key_env = "RANKING_API_KEY"', merged)
+        self.assertIn('base_url = "https://example.test/v1"', merged)
+        self.assertIn('model = "m"', merged)
 
     def test_serve_ui_accepts_open_browser_argument(self):
         import inspect
