@@ -24,6 +24,20 @@ class FakeHandler(PaperWatchHandler):
         self.config_path = Path(config_path)
 
 
+class ConfigPostHandler(FakeHandler):
+    def __init__(self, config_path, content):
+        super().__init__(config_path)
+        self.path = "/api/config"
+        self._content = content
+        self.response = None
+
+    def _read_json(self):
+        return {"content": self._content}
+
+    def _send_json(self, payload):
+        self.response = payload
+
+
 class UiTest(unittest.TestCase):
     def test_list_read_and_delete_digest(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -169,6 +183,29 @@ class UiTest(unittest.TestCase):
             synced = (repo / "config.toml").read_text(encoding="utf-8")
             self.assertIn('base_url = "https://example.test/v1"', synced)
             self.assertIn('model = "embedding-model"', synced)
+
+    def test_save_config_preserves_existing_api_routing_when_submitted_blank(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.toml"
+            current = DEFAULT_CONFIG.replace(
+                'base_url = "https://api.openai.com/v1"',
+                'base_url = "https://example.test/v1"',
+                1,
+            ).replace('model = "text-embedding-3-small"', 'model = "embedding-model"', 1)
+            submitted = current.replace('base_url = "https://example.test/v1"', 'base_url = ""', 1).replace(
+                'model = "embedding-model"',
+                'model = ""',
+                1,
+            )
+            cfg.write_text(current, encoding="utf-8")
+            handler = ConfigPostHandler(cfg, submitted)
+
+            handler.do_POST()
+
+            saved = cfg.read_text(encoding="utf-8")
+            self.assertEqual(handler.response, {"ok": True})
+            self.assertIn('base_url = "https://example.test/v1"', saved)
+            self.assertIn('model = "embedding-model"', saved)
 
     def test_sync_private_config_reports_failure(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -92,6 +92,8 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/config":
             body = self._read_json()
             content = str(body.get("content", ""))
+            if self.config_path.exists():
+                content = _preserve_nonempty_api_routing(content, self.config_path.read_text(encoding="utf-8"))
             load_settings_from_text(content)
             self.config_path.write_text(content, encoding="utf-8")
             self._send_json({"ok": True})
