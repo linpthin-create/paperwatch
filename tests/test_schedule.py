@@ -18,7 +18,8 @@ class ScheduleTest(unittest.TestCase):
                 encoding="utf-8",
             )
             settings = load_settings(config)
-            plist = build_launchd_plist(config, settings)
+            with mock.patch("paperwatch.schedule.Path.home", return_value=Path(tmp)):
+                plist = build_launchd_plist(config, settings)
         self.assertIn(str(config.resolve()), plist["ProgramArguments"])
         self.assertIn("paperwatch", plist["ProgramArguments"])
         self.assertEqual(plist["StartCalendarInterval"]["Hour"], 8)

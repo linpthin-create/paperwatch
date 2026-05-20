@@ -56,7 +56,7 @@ def schedule_status(config_path: str | Path, settings: Settings) -> dict[str, An
 def build_launchd_plist(config_path: str | Path, settings: Settings) -> dict[str, Any]:
     config = Path(config_path).expanduser().resolve()
     workdir = config.parent
-    logs_dir = workdir / "data" / "logs"
+    logs_dir = Path.home() / "Library" / "Logs" / "PaperWatch"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
     environment = _launch_environment()
@@ -93,9 +93,6 @@ def _launch_environment() -> dict[str, str]:
     source_root = Path(__file__).resolve().parents[1]
     if (source_root / "paperwatch" / "__init__.py").exists():
         env["PYTHONPATH"] = str(source_root)
-    path = os.environ.get("PATH")
-    if path:
-        env["PATH"] = path
     return env
 
 

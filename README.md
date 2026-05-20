@@ -432,11 +432,11 @@ Run once through launchd:
 launchctl kickstart -k gui/$(id -u)/com.paperwatch.daily
 ```
 
-Logs are written beside the config file under `data/logs/`:
+Logs are written under `~/Library/Logs/PaperWatch/`:
 
 ```bash
-tail -f data/logs/paperwatch.out.log
-tail -f data/logs/paperwatch.err.log
+tail -f ~/Library/Logs/PaperWatch/paperwatch.out.log
+tail -f ~/Library/Logs/PaperWatch/paperwatch.err.log
 ```
 
 For another Mac or PC:
