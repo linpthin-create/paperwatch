@@ -216,6 +216,18 @@ class UiTest(unittest.TestCase):
             self.assertIn('base_url = "https://example.test/v1"', saved)
             self.assertIn('model = "embedding-model"', saved)
 
+    def test_test_arxiv_source_uses_single_lightweight_request(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.toml"
+            cfg.write_text(DEFAULT_CONFIG, encoding="utf-8")
+            handler = FakeHandler(cfg)
+
+            with mock.patch("paperwatch.sources.arxiv.ArxivSource.fetch_query_once", return_value=[]) as fetch:
+                count = handler._test_source(__import__("paperwatch.config").config.load_settings(cfg), "arxiv")
+
+            self.assertEqual(count, 0)
+            self.assertEqual(fetch.call_count, 1)
+
     def test_sync_private_config_reports_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / "private"

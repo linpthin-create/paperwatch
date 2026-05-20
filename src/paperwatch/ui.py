@@ -269,14 +269,15 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
 
     def _test_source(self, settings, target: str) -> int:
         from datetime import date, timedelta
+        from dataclasses import replace
         from paperwatch.sources import ArxivSource, DblpSource, OpenAlexSource
 
         end_date = date.today() - timedelta(days=1)
         start_date = end_date - timedelta(days=7)
         interest = settings.interests[0]
         if target == "arxiv":
-            source = ArxivSource(settings.arxiv)
-            return len(source.fetch(interest, start_date, end_date)[:1])
+            source = ArxivSource(replace(settings.arxiv, max_results_per_interest=1, request_timeout_seconds=8))
+            return len(source.fetch_query_once(source._build_date_query(start_date, end_date))[:1])
         if target == "openalex":
             source = OpenAlexSource(settings.openalex)
             return len(source.fetch(interest, start_date, end_date)[:1])

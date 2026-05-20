@@ -40,12 +40,26 @@ class ArxivSource:
             url,
             headers={"User-Agent": "paperwatch/0.1 (daily research paper watcher)"},
         )
-        payload = self._open_with_retries(request)
+        payload = self._open_with_retries(request, waits=[5, 15, 45])
         time.sleep(3.0)
         return self._parse_feed(payload)
 
-    def _open_with_retries(self, request: urllib.request.Request) -> bytes:
-        waits = [5, 15, 45]
+    def fetch_query_once(self, query: str) -> list[Paper]:
+        params = {
+            "search_query": query,
+            "start": "0",
+            "max_results": str(self.config.max_results_per_interest),
+            "sortBy": "submittedDate",
+            "sortOrder": "descending",
+        }
+        url = f"{ARXIV_API_URL}?{urllib.parse.urlencode(params)}"
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "paperwatch/0.1 (daily research paper watcher)"},
+        )
+        return self._parse_feed(self._open_with_retries(request, waits=[]))
+
+    def _open_with_retries(self, request: urllib.request.Request, waits: list[int]) -> bytes:
         for attempt in range(len(waits) + 1):
             try:
                 with urllib.request.urlopen(request, timeout=self.config.request_timeout_seconds) as response:
