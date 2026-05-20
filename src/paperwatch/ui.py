@@ -78,6 +78,12 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
             self._send_json(_get_run_job(job_id))
         elif parsed.path == "/api/schedule-status":
             self._send_json(self._schedule_status())
+        elif parsed.path == "/api/github-schedule":
+            query = parse_qs(parsed.query)
+            try:
+                self._send_json({"ok": True, **self._github_schedule(str(query.get("repo_path", [""])[0]))})
+            except RuntimeError as exc:
+                self._send_json({"ok": False, "error": str(exc)})
         else:
             self.send_error(404)
 
@@ -166,6 +172,17 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
                 result = self._sync_private_config(str(body.get("repo_path", "")))
                 self._send_json({"ok": True, **result})
             except RuntimeError as exc:
+                self._send_json({"ok": False, "error": str(exc)})
+        elif parsed.path == "/api/github-schedule":
+            body = self._read_json()
+            try:
+                result = self._update_github_schedule(
+                    str(body.get("repo_path", "")),
+                    int(body.get("hour", 0)),
+                    int(body.get("minute", 0)),
+                )
+                self._send_json({"ok": True, **result})
+            except (RuntimeError, ValueError) as exc:
                 self._send_json({"ok": False, "error": str(exc)})
         elif parsed.path == "/api/generate-interest":
             from paperwatch.ai import generate_interest_from_paper
@@ -287,12 +304,7 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
         raise RuntimeError(f"unknown schedule action: {action}")
 
     def _sync_private_config(self, repo_path: str) -> dict:
-        repo = Path(
-            repo_path
-            or os.environ.get("PAPERWATCH_PRIVATE_REPO", "~/Documents/tools/paperwatch-private")
-        ).expanduser()
-        if not (repo / ".git").exists():
-            raise RuntimeError(f"Private repository path is not a git checkout: {repo}")
+        repo = self._private_repo(repo_path)
         content = self.config_path.read_text(encoding="utf-8")
         content = re.sub(r'api_key = "[^"]*"', 'api_key = ""', content)
         content = re.sub(r'webhook_url = "[^"]*"', 'webhook_url = ""', content)
@@ -309,6 +321,58 @@ class PaperWatchHandler(BaseHTTPRequestHandler):
         self._run_git(repo, ["commit", "-m", "Update private PaperWatch config"])
         self._run_git(repo, ["push"])
         return {"message": "Private config synced and pushed."}
+
+    def _github_schedule(self, repo_path: str) -> dict:
+        repo = self._private_repo(repo_path)
+        workflow = self._workflow_path(repo)
+        content = workflow.read_text(encoding="utf-8")
+        minute, hour = _parse_daily_cron(content)
+        local_hour, local_minute = _utc_to_shanghai(hour, minute)
+        return {
+            "repo_path": str(repo),
+            "hour": local_hour,
+            "minute": local_minute,
+            "utc_hour": hour,
+            "utc_minute": minute,
+            "cron": f"{minute} {hour} * * *",
+        }
+
+    def _update_github_schedule(self, repo_path: str, hour: int, minute: int) -> dict:
+        if hour < 0 or hour > 23:
+            raise ValueError("Beijing hour must be 0-23")
+        if minute < 0 or minute > 59:
+            raise ValueError("Beijing minute must be 0-59")
+        repo = self._private_repo(repo_path)
+        workflow = self._workflow_path(repo)
+        content = workflow.read_text(encoding="utf-8")
+        utc_hour, utc_minute = _shanghai_to_utc(hour, minute)
+        cron = f"{utc_minute} {utc_hour} * * *"
+        updated = _replace_daily_cron(content, cron, f"{hour:02d}:{minute:02d} Asia/Shanghai")
+        if updated == content:
+            return {"message": f"GitHub schedule already set to {hour:02d}:{minute:02d} Asia/Shanghai."}
+        workflow.write_text(updated, encoding="utf-8")
+        self._run_git(repo, ["add", ".github/workflows/daily-paperwatch.yml"])
+        self._run_git(repo, ["commit", "-m", "Update daily PaperWatch schedule"])
+        self._run_git(repo, ["push"])
+        return {
+            "message": f"GitHub schedule updated to {hour:02d}:{minute:02d} Asia/Shanghai and pushed.",
+            "cron": cron,
+        }
+
+    def _private_repo(self, repo_path: str) -> Path:
+        repo = Path(
+            repo_path
+            or os.environ.get("PAPERWATCH_PRIVATE_REPO", "~/Documents/tools/paperwatch-private")
+        ).expanduser()
+        if not (repo / ".git").exists():
+            raise RuntimeError(f"Private repository path is not a git checkout: {repo}")
+        return repo
+
+    def _workflow_path(self, repo: Path) -> Path:
+        workflow = repo / ".github" / "workflows" / "daily-paperwatch.yml"
+        if not workflow.exists():
+            raise RuntimeError(f"GitHub Actions workflow not found: {workflow}")
+        return workflow
 
     def _run_git(self, repo: Path, args: list[str]) -> None:
         result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=120)
@@ -344,6 +408,33 @@ def load_settings_from_text(content: str) -> None:
         tmp.write(content)
         tmp.flush()
         load_settings(tmp.name)
+
+
+def _parse_daily_cron(content: str) -> tuple[int, int]:
+    match = re.search(r'cron:\s*["\'](\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*["\']', content)
+    if not match:
+        raise RuntimeError("Could not find daily cron in workflow")
+    minute = int(match.group(1))
+    hour = int(match.group(2))
+    if minute > 59 or hour > 23:
+        raise RuntimeError("Workflow cron is not a valid daily UTC time")
+    return minute, hour
+
+
+def _replace_daily_cron(content: str, cron: str, comment: str) -> str:
+    pattern = r'(\s*-\s*cron:\s*)["\']\d{1,2}\s+\d{1,2}\s+\*\s+\*\s+\*["\'](?:\s*#.*)?'
+    updated, count = re.subn(pattern, rf'\1"{cron}" # {comment}', content, count=1)
+    if count != 1:
+        raise RuntimeError("Could not update daily cron in workflow")
+    return updated
+
+
+def _utc_to_shanghai(hour: int, minute: int) -> tuple[int, int]:
+    return ((hour + 8) % 24, minute)
+
+
+def _shanghai_to_utc(hour: int, minute: int) -> tuple[int, int]:
+    return ((hour - 8) % 24, minute)
 
 
 def _create_interest_job() -> str:
@@ -895,10 +986,13 @@ INDEX_HTML = r"""<!doctype html>
             <p class="module-help">Sync the current config to a private repository. Credentials are stripped; update API keys and Feishu values in GitHub Secrets.</p>
             <div class="form-grid">
               <div class="field"><label>Private repo path</label><input id="cfg-private-repo-path" value="~/Documents/tools/paperwatch-private"></div>
-              <div class="field"><label>Current workflow time</label><input value="12:30 Asia/Shanghai / 04:30 UTC / cron 30 4 * * *" disabled></div>
+              <div class="field"><label>GitHub run hour (Beijing)</label><input id="cfg-github-hour" type="number" min="0" max="23" value="12"></div>
+              <div class="field"><label>GitHub run minute (Beijing)</label><input id="cfg-github-minute" type="number" min="0" max="59" value="30"></div>
             </div>
             <div class="row">
               <button class="primary" onclick="syncPrivateConfig()">Sync config to private repo</button>
+              <button class="subtle" onclick="loadGithubSchedule()">Load GitHub time</button>
+              <button class="subtle" onclick="saveGithubSchedule()">Save GitHub time</button>
               <span class="muted" id="private-sync-status"></span>
             </div>
           </div>
@@ -1075,6 +1169,44 @@ INDEX_HTML = r"""<!doctype html>
       } catch (e) {
         status.textContent = 'Failed: ' + e;
       }
+    }
+    async function loadGithubSchedule() {
+      const status = document.getElementById('private-sync-status');
+      status.textContent = 'Loading GitHub time...';
+      try {
+        const repoPath = document.getElementById('cfg-private-repo-path').value;
+        const data = await getJson('/api/github-schedule?repo_path=' + encodeURIComponent(repoPath));
+        if (!data.ok) {
+          status.textContent = 'Failed: ' + (data.error || 'unknown error');
+          return;
+        }
+        document.getElementById('cfg-github-hour').value = data.hour;
+        document.getElementById('cfg-github-minute').value = data.minute;
+        status.textContent = `Loaded ${pad2(data.hour)}:${pad2(data.minute)} Beijing time.`;
+      } catch (e) {
+        status.textContent = 'Failed: ' + e;
+      }
+    }
+    async function saveGithubSchedule() {
+      const status = document.getElementById('private-sync-status');
+      status.textContent = 'Saving GitHub time...';
+      try {
+        const data = await postJson('/api/github-schedule', {
+          repo_path: document.getElementById('cfg-private-repo-path').value,
+          hour: Number(document.getElementById('cfg-github-hour').value),
+          minute: Number(document.getElementById('cfg-github-minute').value)
+        });
+        if (!data.ok) {
+          status.textContent = 'Failed: ' + (data.error || 'unknown error');
+          return;
+        }
+        status.textContent = data.message || 'GitHub time saved.';
+      } catch (e) {
+        status.textContent = 'Failed: ' + e;
+      }
+    }
+    function pad2(value) {
+      return String(value).padStart(2, '0');
     }
     async function loadDigests() {
       const data = await getJson('/api/digests');

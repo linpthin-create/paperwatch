@@ -461,7 +461,9 @@ The bundled workflow is:
 
 It runs every day at `04:30 UTC`, which is `12:30 Asia/Shanghai`, and can also be started manually from the GitHub Actions page. GitHub scheduled workflows use UTC cron and may be delayed under GitHub Actions load.
 
-GitHub Actions ignores the local `[schedule]` block in `config.toml`. To change the GitHub run time, edit the cron line in `.github/workflows/daily-paperwatch.yml`:
+GitHub Actions ignores the local `[schedule]` block in `config.toml`. To change the GitHub run time from the Web UI, open Config -> GitHub Actions, enter the Beijing hour and minute, then click `Save GitHub time`.
+
+Advanced users can also edit the cron line in `.github/workflows/daily-paperwatch.yml`:
 
 ```yaml
 on:

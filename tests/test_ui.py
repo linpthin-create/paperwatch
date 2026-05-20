@@ -9,8 +9,12 @@ from paperwatch.ui import (
     _extract_arxiv_id,
     _extract_arxiv_ids,
     _fetch_arxiv_record,
+    _parse_daily_cron,
+    _replace_daily_cron,
     _resolve_interest_builder_input,
+    _shanghai_to_utc,
     _truncate_source_text,
+    _utc_to_shanghai,
 )
 
 
@@ -97,6 +101,11 @@ class UiTest(unittest.TestCase):
         self.assertIn("data-target=\"cfg-github\"", INDEX_HTML)
         self.assertIn("syncPrivateConfig", INDEX_HTML)
         self.assertIn("/api/sync-private-config", INDEX_HTML)
+        self.assertIn("cfg-github-hour", INDEX_HTML)
+        self.assertIn("cfg-github-minute", INDEX_HTML)
+        self.assertIn("loadGithubSchedule", INDEX_HTML)
+        self.assertIn("saveGithubSchedule", INDEX_HTML)
+        self.assertIn("/api/github-schedule", INDEX_HTML)
         self.assertIn("scrollConfigModule", INDEX_HTML)
         self.assertIn("cfg-auto", INDEX_HTML)
         self.assertIn("sendCurrentDigestFeishu", INDEX_HTML)
@@ -148,6 +157,55 @@ class UiTest(unittest.TestCase):
                     handler._sync_private_config(str(repo))
 
             self.assertIn("push failed", str(raised.exception))
+
+    def test_github_schedule_reads_beijing_time(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "private"
+            workflow = repo / ".github" / "workflows"
+            workflow.mkdir(parents=True)
+            (repo / ".git").mkdir()
+            (workflow / "daily-paperwatch.yml").write_text(
+                'on:\n  schedule:\n    - cron: "30 4 * * *" # 12:30 Asia/Shanghai\n',
+                encoding="utf-8",
+            )
+            cfg = Path(tmp) / "config.toml"
+            cfg.write_text(DEFAULT_CONFIG, encoding="utf-8")
+
+            schedule = FakeHandler(cfg)._github_schedule(str(repo))
+
+            self.assertEqual(schedule["hour"], 12)
+            self.assertEqual(schedule["minute"], 30)
+            self.assertEqual(schedule["cron"], "30 4 * * *")
+
+    def test_update_github_schedule_writes_utc_cron(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "private"
+            workflow = repo / ".github" / "workflows"
+            workflow.mkdir(parents=True)
+            (repo / ".git").mkdir()
+            path = workflow / "daily-paperwatch.yml"
+            path.write_text(
+                'on:\n  schedule:\n    - cron: "30 4 * * *" # 12:30 Asia/Shanghai\n',
+                encoding="utf-8",
+            )
+            cfg = Path(tmp) / "config.toml"
+            cfg.write_text(DEFAULT_CONFIG, encoding="utf-8")
+            handler = FakeHandler(cfg)
+
+            with mock.patch.object(handler, "_run_git") as run_git:
+                result = handler._update_github_schedule(str(repo), 9, 5)
+
+            self.assertIn('cron: "5 1 * * *" # 09:05 Asia/Shanghai', path.read_text(encoding="utf-8"))
+            self.assertIn("09:05", result["message"])
+            self.assertEqual(run_git.call_count, 3)
+
+    def test_cron_helpers_convert_times(self):
+        content = '    - cron: "0 15 * * *" # 23:00 Asia/Shanghai\n'
+        self.assertEqual(_parse_daily_cron(content), (0, 15))
+        self.assertEqual(_utc_to_shanghai(15, 0), (23, 0))
+        self.assertEqual(_shanghai_to_utc(23, 0), (15, 0))
+        updated = _replace_daily_cron(content, "0 1 * * *", "09:00 Asia/Shanghai")
+        self.assertIn('cron: "0 1 * * *" # 09:00 Asia/Shanghai', updated)
 
     def test_serve_ui_accepts_open_browser_argument(self):
         import inspect
